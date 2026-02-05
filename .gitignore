@@ -1,0 +1,92 @@
+# ========================================
+# GITIGNORE PRINCIPAL - SaaS Coiffure
+# ========================================
+
+# Fichiers de configuration IDE globaux
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Fichiers système
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Fichiers temporaires
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*~
+
+# Logs globaux
+*.log
+logs/
+
+# Variables d'environnement
+.env
+.env.local
+.env.development
+.env.production
+
+# Fichiers de cache
+.cache/
+*.cache
+
+# Fichiers de sauvegarde d'éditeur
+*.swp
+*.swo
+*~
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Documents Office (sources dans le repo)
+*.docx
+*.doc
+*.pptx
+*.ppt
+*.xlsx
+*.xls
+
+# PDFs générés (garder seulement les sources)
+# Si vous voulez garder les PDFs, commentez cette ligne
+*.pdf
+
+# Documentation générée
+docs/_build/
+site/
+
+# Fichiers de sécurité
+*.pem
+*.key
+*.crt
+*.p12
+secrets.json
+
+# Dossiers de tests et couverture
+coverage/
+.nyc_output/
+htmlcov/
+
+# Scripts personnels temporaires
+temp_*
+test_*
+debug_*
+
+# Base de données locales de test
+*.sqlite
+*.db
+
+# Fichiers de migration temporaires
+*_temp_migration*
