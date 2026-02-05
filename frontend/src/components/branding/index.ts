@@ -1,0 +1,2 @@
+export { BrandingFooter } from './BrandingFooter';
+

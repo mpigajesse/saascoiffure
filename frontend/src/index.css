@@ -1,0 +1,285 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* African-Inspired Modern Design System
+   Colors inspired by African landscapes: terracotta, gold, savanna, sunset
+*/
+
+@layer base {
+  :root {
+    /* Warm cream background inspired by African sand */
+    --background: 35 30% 97%;
+    --foreground: 25 40% 15%;
+
+    /* Card with warm undertone */
+    --card: 35 25% 99%;
+    --card-foreground: 25 40% 15%;
+
+    --popover: 35 25% 99%;
+    --popover-foreground: 25 40% 15%;
+
+    /* Primary: Rich Terracotta */
+    --primary: 15 70% 45%;
+    --primary-foreground: 35 30% 97%;
+
+    /* Secondary: Warm Sand */
+    --secondary: 35 35% 92%;
+    --secondary-foreground: 25 40% 20%;
+
+    /* Muted: Soft Earth */
+    --muted: 30 20% 94%;
+    --muted-foreground: 25 20% 45%;
+
+    /* Accent: African Gold */
+    --accent: 42 85% 55%;
+    --accent-foreground: 25 40% 15%;
+
+    /* Destructive: Desert Red */
+    --destructive: 5 75% 50%;
+    --destructive-foreground: 35 30% 97%;
+
+    /* Borders: Warm brown */
+    --border: 25 25% 80%;
+    --input: 25 25% 75%;
+    --ring: 15 70% 45%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar: Deep Earth */
+    --sidebar-background: 25 35% 12%;
+    --sidebar-foreground: 35 25% 95%;
+    --sidebar-primary: 42 85% 55%;
+    --sidebar-primary-foreground: 25 40% 15%;
+    --sidebar-accent: 25 30% 20%;
+    --sidebar-accent-foreground: 35 25% 95%;
+    --sidebar-border: 25 25% 25%;
+    --sidebar-ring: 42 85% 55%;
+    --sidebar: 25 35% 12%;
+
+    /* Chart colors: African sunset palette */
+    --chart-1: 15 70% 50%;
+    --chart-2: 42 85% 55%;
+    --chart-3: 140 40% 35%;
+    --chart-4: 25 60% 40%;
+    --chart-5: 350 65% 50%;
+
+    /* Gabon flag colors (vert, jaune, bleu) */
+    --gabon-green: 150 100% 33%;  /* #00A859 */
+    --gabon-yellow: 48 98% 54%;   /* #FCD116 */
+    --gabon-blue: 150 100% 31%;   /* #009E60 */
+
+    /* Typography */
+    --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+    --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+    /* African-inspired shadows with warm tones */
+    --shadow-2xs: 0 1px 2px 0 hsla(25, 40%, 20%, 0.05);
+    --shadow-xs: 0 1px 3px 0 hsla(25, 40%, 20%, 0.1), 0 1px 2px -1px hsla(25, 40%, 20%, 0.1);
+    --shadow-sm: 0 2px 4px 0 hsla(25, 40%, 20%, 0.1), 0 1px 2px -1px hsla(25, 40%, 20%, 0.1);
+    --shadow: 0 4px 6px -1px hsla(25, 40%, 20%, 0.1), 0 2px 4px -2px hsla(25, 40%, 20%, 0.1);
+    --shadow-md: 0 6px 12px -2px hsla(25, 40%, 20%, 0.12), 0 3px 6px -3px hsla(25, 40%, 20%, 0.1);
+    --shadow-lg: 0 10px 20px -3px hsla(25, 40%, 20%, 0.15), 0 4px 8px -4px hsla(25, 40%, 20%, 0.1);
+    --shadow-xl: 0 20px 30px -5px hsla(25, 40%, 20%, 0.2), 0 8px 12px -6px hsla(25, 40%, 20%, 0.1);
+    --shadow-2xl: 0 25px 50px -12px hsla(25, 40%, 20%, 0.25);
+
+    /* Glow effects for accent elements */
+    --shadow-glow: 0 0 20px hsla(42, 85%, 55%, 0.3);
+    --shadow-glow-primary: 0 0 25px hsla(15, 70%, 45%, 0.25);
+
+    --tracking-normal: 0em;
+    --spacing: 0.25rem;
+  }
+
+  .dark {
+    /* Deep African night */
+    --background: 25 30% 8%;
+    --foreground: 35 25% 95%;
+
+    --card: 25 28% 12%;
+    --card-foreground: 35 25% 95%;
+
+    --popover: 25 28% 12%;
+    --popover-foreground: 35 25% 95%;
+
+    /* Primary: Warm Terracotta */
+    --primary: 15 65% 55%;
+    --primary-foreground: 25 30% 8%;
+
+    /* Secondary: Deep Earth */
+    --secondary: 25 25% 18%;
+    --secondary-foreground: 35 25% 90%;
+
+    --muted: 25 20% 18%;
+    --muted-foreground: 35 15% 60%;
+
+    /* Accent: Bright Gold */
+    --accent: 42 90% 50%;
+    --accent-foreground: 25 30% 8%;
+
+    --destructive: 5 70% 45%;
+    --destructive-foreground: 35 25% 95%;
+
+    --border: 25 20% 25%;
+    --input: 25 20% 30%;
+    --ring: 42 90% 50%;
+
+    --sidebar-background: 25 35% 6%;
+    --sidebar-foreground: 35 25% 95%;
+    --sidebar-primary: 42 90% 50%;
+    --sidebar-primary-foreground: 25 30% 8%;
+    --sidebar-accent: 25 25% 15%;
+    --sidebar-accent-foreground: 35 25% 95%;
+    --sidebar-border: 25 20% 20%;
+    --sidebar-ring: 42 90% 50%;
+    --sidebar: 25 35% 6%;
+
+    --chart-1: 15 65% 55%;
+    --chart-2: 42 90% 55%;
+    --chart-3: 140 50% 45%;
+    --chart-4: 25 55% 50%;
+    --chart-5: 350 60% 55%;
+
+    /* Gabon flag colors (vert, jaune, bleu) - dark mode */
+    --gabon-green: 150 100% 38%;
+    --gabon-yellow: 48 98% 60%;
+    --gabon-blue: 150 100% 36%;
+
+    --shadow-2xs: 0 1px 2px 0 hsla(0, 0%, 0%, 0.2);
+    --shadow-xs: 0 1px 3px 0 hsla(0, 0%, 0%, 0.3);
+    --shadow-sm: 0 2px 4px 0 hsla(0, 0%, 0%, 0.3);
+    --shadow: 0 4px 6px -1px hsla(0, 0%, 0%, 0.35);
+    --shadow-md: 0 6px 12px -2px hsla(0, 0%, 0%, 0.4);
+    --shadow-lg: 0 10px 20px -3px hsla(0, 0%, 0%, 0.45);
+    --shadow-xl: 0 20px 30px -5px hsla(0, 0%, 0%, 0.5);
+    --shadow-2xl: 0 25px 50px -12px hsla(0, 0%, 0%, 0.6);
+    --shadow-glow: 0 0 30px hsla(42, 90%, 50%, 0.4);
+    --shadow-glow-primary: 0 0 30px hsla(15, 65%, 55%, 0.35);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  /* African pattern overlays */
+  .pattern-kente {
+    background-image: 
+      linear-gradient(45deg, hsla(42, 85%, 55%, 0.1) 25%, transparent 25%),
+      linear-gradient(-45deg, hsla(15, 70%, 45%, 0.1) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, hsla(42, 85%, 55%, 0.1) 75%),
+      linear-gradient(-45deg, transparent 75%, hsla(15, 70%, 45%, 0.1) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+
+  .pattern-mudcloth {
+    background-image: 
+      radial-gradient(circle at 25% 25%, hsla(25, 40%, 20%, 0.05) 2px, transparent 2px),
+      radial-gradient(circle at 75% 75%, hsla(25, 40%, 20%, 0.05) 2px, transparent 2px);
+    background-size: 24px 24px;
+  }
+
+  /* Pattern avec couleurs gabonaises */
+  .pattern-gabon {
+    background-image: 
+      linear-gradient(45deg, hsla(var(--gabon-green), 0.1) 25%, transparent 25%),
+      linear-gradient(-45deg, hsla(var(--gabon-yellow), 0.1) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, hsla(var(--gabon-blue), 0.1) 75%),
+      linear-gradient(-45deg, transparent 75%, hsla(var(--gabon-green), 0.1) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+
+  /* Gradient backgrounds */
+  .gradient-sunset {
+    background: linear-gradient(135deg, hsl(15, 70%, 45%) 0%, hsl(42, 85%, 55%) 50%, hsl(25, 60%, 40%) 100%);
+  }
+
+  .gradient-savanna {
+    background: linear-gradient(180deg, hsl(35, 30%, 97%) 0%, hsl(35, 35%, 92%) 100%);
+  }
+
+  .gradient-night {
+    background: linear-gradient(180deg, hsl(25, 30%, 8%) 0%, hsl(25, 35%, 15%) 100%);
+  }
+
+  /* Gabon flag gradient (vert, jaune, bleu) */
+  .gradient-gabon {
+    background: linear-gradient(135deg, hsl(var(--gabon-green)) 0%, hsl(var(--gabon-yellow)) 50%, hsl(var(--gabon-blue)) 100%);
+  }
+
+  .gradient-gabon-horizontal {
+    background: linear-gradient(90deg, hsl(var(--gabon-green)) 0%, hsl(var(--gabon-yellow)) 50%, hsl(var(--gabon-blue)) 100%);
+  }
+
+  .gradient-gabon-vertical {
+    background: linear-gradient(180deg, hsl(var(--gabon-green)) 0%, hsl(var(--gabon-yellow)) 50%, hsl(var(--gabon-blue)) 100%);
+  }
+
+  /* Glass effect with warm tones */
+  .glass {
+    background: hsla(35, 25%, 99%, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .dark .glass {
+    background: hsla(25, 28%, 12%, 0.8);
+  }
+
+  /* Shimmer animation for loading states */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsla(35, 25%, 90%, 0) 0%,
+      hsla(42, 85%, 55%, 0.15) 50%,
+      hsla(35, 25%, 90%, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Animations spécifiques pour les symboles africains */
+  .symbol-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .symbol-pulse {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .symbol-rotate {
+    animation: spin-slow 8s linear infinite;
+  }
+
+  /* Effet de brillance pour les symboles */
+  .symbol-glow {
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+
+  .symbol-glow:hover {
+    filter: drop-shadow(0 0 12px currentColor);
+  }
+}
