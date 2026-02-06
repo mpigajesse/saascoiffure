@@ -10,24 +10,44 @@ export interface ServiceCategory {
   salon: number;
   name: string;
   description: string;
+  color?: string; // Optional property from frontend
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
+export type ServiceTarget = 'homme' | 'femme' | 'enfant_fille' | 'enfant_garcon';
+
+export interface ServiceImage {
+  id: number;
+  image: string;
+  alt_text?: string;
+  is_primary: boolean;
+  order: number;
+}
+
 export interface Service {
   id: number;
   salon: number;
-  category: number;
+  category: number; // ID of the category
   category_name?: string;
+  categoryId?: string;
   name: string;
   description: string;
   price: string;
   duration: number;
   image?: string;
+  images?: ServiceImage[];
+  main_image_url?: string;
+  target?: ServiceTarget;
   is_active: boolean;
+  is_published?: boolean;
   created_at: string;
   updated_at: string;
+ 
+  // Compatibility properties for frontend code that might use these names
+  isActive?: boolean;
+  isPublished?: boolean;
 }
 
 export interface ServiceFilters {
@@ -67,9 +87,10 @@ export const servicesService = {
   /**
    * Create new service
    */
-  async createService(data: Partial<Service>): Promise<Service> {
+  async createService(data: Partial<Service>, salonId?: string | number): Promise<Service> {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.services.create, data);
+      const config = salonId ? { headers: { 'X-Salon-Id': String(salonId) } } : {};
+      const response = await apiClient.post(API_ENDPOINTS.services.create, data, config);
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));

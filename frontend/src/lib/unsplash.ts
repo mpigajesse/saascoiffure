@@ -103,7 +103,7 @@ const SERVICE_IMAGES = [
  * @returns URL de l'image
  */
 export function getServiceImage(
-  serviceId: string | undefined | null,
+  serviceId: string | number | undefined | null,
   width: number = 800,
   height: number = 600
 ): string {

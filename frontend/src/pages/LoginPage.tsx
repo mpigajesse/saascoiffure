@@ -181,11 +181,11 @@ export default function LoginPage() {
                   <div className="space-y-0.5 text-xs text-muted-foreground">
                     <p className="flex items-center gap-2">
                       <span className="font-medium">Email:</span>
-                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">admin@salon-mireille.ga</code>
+                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">naoadmin@gmail.com</code>
                     </p>
                     <p className="flex items-center gap-2">
                       <span className="font-medium">Mot de passe:</span>
-                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">admin123</code>
+                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">Admin@2026</code>
                     </p>
                   </div>
                 </div>

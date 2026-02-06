@@ -2,6 +2,7 @@
 Serializers for Clients app
 """
 from rest_framework import serializers
+from apps.core.validators import validate_gabon_phone, normalize_gabon_phone
 from .models import Client
 
 
@@ -38,9 +39,27 @@ class ClientCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_phone(self, value):
-        """Vérifie que le téléphone n'existe pas déjà pour ce salon"""
-        salon = self.context['request'].salon
-        if Client.objects.filter(salon=salon, phone=value).exists():
+        """Valide et normalise le format du numéro de téléphone gabonais"""
+        # Validation du format gabonais
+        if value:
+            validate_gabon_phone(value)
+            value = normalize_gabon_phone(value)
+        
+        # Vérifie que le téléphone n'existe pas déjà pour ce salon
+        request = self.context.get('request')
+        salon = getattr(request, 'salon', None) if request else None
+        
+        # For superusers, try to get salon from header
+        if not salon and request and request.user.is_superuser:
+            from apps.core.models import Salon
+            salon_id = request.headers.get('X-Salon-Id') or request.META.get('HTTP_X_SALON_ID')
+            if salon_id:
+                try:
+                    salon = Salon.objects.get(id=salon_id)
+                except (Salon.DoesNotExist, ValueError):
+                    pass
+        
+        if salon and Client.objects.filter(salon=salon, phone=value).exists():
             raise serializers.ValidationError(
                 "Un client avec ce numéro de téléphone existe déjà dans votre salon"
             )

@@ -20,7 +20,7 @@ export default function ClientDetailPage() {
   const { data: client, isLoading: isLoadingClient } = useQuery<Client>({
     queryKey: ['client', id],
     queryFn: async () => {
-      const response = await apiClient.get(`/clients/${id}/`);
+      const response = await apiClient.get(`/api/v1/clients/${id}/`);
       return response.data;
     },
     enabled: !!id,
@@ -30,7 +30,7 @@ export default function ClientDetailPage() {
   const { data: clientAppointments = [] } = useQuery<Appointment[]>({
     queryKey: ['clientAppointments', id],
     queryFn: async () => {
-      const response = await apiClient.get(`/appointments/?client=${id}`);
+      const response = await apiClient.get(`/api/v1/appointments/?client=${id}`);
       return Array.isArray(response.data) ? response.data : (response.data.results || []);
     },
     enabled: !!id,
@@ -186,7 +186,7 @@ export default function ClientDetailPage() {
           <div className="space-y-6">
             <div className="bg-card border border-border rounded-xl p-6 space-y-6">
               <h3 className="text-lg font-semibold">Statistiques</h3>
-              
+
               <div className="space-y-4">
                 <div className="text-center p-4 bg-secondary/50 rounded-lg">
                   <p className="text-3xl font-bold text-primary">{clientAppointments.length}</p>
@@ -208,8 +208,8 @@ export default function ClientDetailPage() {
             </div>
 
             <div className="bg-card border border-border rounded-xl p-6 space-y-3">
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 variant="outline"
                 onClick={() => navigate(`/clients/${client.id}/edit`)}
               >

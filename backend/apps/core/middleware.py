@@ -3,6 +3,7 @@ Multi-tenant middleware
 Injecte automatiquement le salon actif dans chaque requête
 """
 from django.utils.deprecation import MiddlewareMixin
+from apps.core.models import Salon
 
 
 class TenantMiddleware(MiddlewareMixin):
@@ -20,11 +21,23 @@ class TenantMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         """Injection du salon dans la requête"""
+        request.salon = None
+
         if hasattr(request, 'user') and request.user.is_authenticated:
             # Récupère le salon de l'utilisateur authentifié
             request.salon = getattr(request.user, 'salon', None)
-        else:
-            # Aucun salon pour les utilisateurs non authentifiés
-            request.salon = None
+            
+            # Pour les superutilisateurs, permettre de forcer le salon via header
+            if request.user.is_superuser:
+                salon_id_header = request.headers.get('X-Salon-Id')
+                if salon_id_header:
+                    try:
+                        request.salon = Salon.objects.get(id=salon_id_header)
+                        # print(f"DEBUG: Middleware forced salon to {request.salon} from header {salon_id_header}")
+                    except (Salon.DoesNotExist, ValueError):
+                        # print(f"DEBUG: Middleware failed to find salon from header {salon_id_header}")
+                        pass
+                # else:
+                    # print("DEBUG: No X-Salon-Id header found for superuser")
         
         return None

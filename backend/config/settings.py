@@ -5,6 +5,7 @@ Django settings for SaaS Coiffure project.
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
+from corsheaders.defaults import default_headers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,7 +16,19 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-produc
 # Debug mode
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = [
+    'localhost', 
+    '127.0.0.1', 
+    '0.0.0.0',
+    # Cloudflare Tunnel Workers (accept all subdomains)
+    '.workers.dev',
+    # Accept all trycloudflare.com subdomains
+    '.trycloudflare.com',
+]
+
+# Trust Cloudflare Proxy headers
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 INSTALLED_APPS = [
@@ -171,6 +184,21 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-salon-id',
+    'X-Salon-Id',
+]
+# Allow Cloudflare Workers and tunnel URLs
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.workers\.dev$",
+    r"^https://.*\.trycloudflare\.com$",
+]
+
+# CSRF Settings for Tunnel
+CSRF_TRUSTED_ORIGINS = [
+    "https://tunnel-front-naoservices.workers.dev",
+    "https://tunnel-back-naoservices.workers.dev",
+]
 
 # Email Configuration
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')

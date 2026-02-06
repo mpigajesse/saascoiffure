@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  User, 
-  Scissors, 
-  Mail, 
-  Phone, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  User,
+  Scissors,
+  Mail,
+  Phone,
   MapPin,
   Edit,
   Trash2,
@@ -26,6 +26,7 @@ import {
   CalendarX,
   CalendarClock
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,12 +41,10 @@ import {
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Appointment, AppointmentStatus } from '@/types';
-import { useAppointments } from '@/contexts/AppointmentsContext';
-import { getServiceById } from '@/data/mockData';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -64,44 +63,45 @@ import {
 } from '@/components/ui/select';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { apiClient } from '@/lib/api-client';
 
-const statusConfig: Record<AppointmentStatus, { 
-  label: string; 
+const statusConfig: Record<string, {
+  label: string;
   className: string;
   icon: React.ReactNode;
 }> = {
-  pending: { 
-    label: 'En attente', 
+  pending: {
+    label: 'En attente',
     className: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20',
     icon: <AlertCircle className="w-4 h-4" />
   },
-  confirmed: { 
-    label: 'Confirmé', 
+  confirmed: {
+    label: 'Confirmé',
     className: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20',
     icon: <CheckCircle2 className="w-4 h-4" />
   },
-  in_progress: { 
-    label: 'En cours', 
+  in_progress: {
+    label: 'En cours',
     className: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
     icon: <Clock className="w-4 h-4" />
   },
-  completed: { 
-    label: 'Terminé', 
+  completed: {
+    label: 'Terminé',
     className: 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20',
     icon: <CheckCircle2 className="w-4 h-4" />
   },
-  cancelled: { 
-    label: 'Annulé', 
+  cancelled: {
+    label: 'Annulé',
     className: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
     icon: <XCircle className="w-4 h-4" />
   },
-  no_show: { 
-    label: 'Absent', 
+  no_show: {
+    label: 'Absent',
     className: 'bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20',
     icon: <XCircle className="w-4 h-4" />
   },
-  rescheduled: { 
-    label: 'Reporté', 
+  rescheduled: {
+    label: 'Reporté',
     className: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
     icon: <CalendarClock className="w-4 h-4" />
   },
@@ -132,7 +132,34 @@ const timeSlots = [
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { appointments, clients, getClientById, updateAppointmentStatus } = useAppointments();
+
+  const { data: appointment, isLoading: loading, refetch: refetchAppointment } = useQuery({
+    queryKey: ['appointment', id],
+    queryFn: async () => {
+      const response = await apiClient.get(`/api/v1/appointments/${id}/`);
+      return response.data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: clientData } = useQuery({
+    queryKey: ['client', appointment?.client],
+    queryFn: async () => {
+      const response = await apiClient.get(`/api/v1/clients/${appointment.client}/`);
+      return response.data;
+    },
+    enabled: !!appointment?.client,
+  });
+
+  const { data: serviceData } = useQuery({
+    queryKey: ['service', appointment?.service],
+    queryFn: async () => {
+      const response = await apiClient.get(`/api/v1/services/${appointment.service}/`);
+      return response.data;
+    },
+    enabled: !!appointment?.service,
+  });
+
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -144,7 +171,9 @@ export default function AppointmentDetailPage() {
   const [newDate, setNewDate] = useState<Date | undefined>(undefined);
   const [newTime, setNewTime] = useState('');
 
-  const appointment = id ? appointments.find(apt => apt.id === id) : null;
+  const fetchAppointment = async () => {
+    await refetchAppointment();
+  };
 
   if (!appointment) {
     return (
@@ -162,17 +191,48 @@ export default function AppointmentDetailPage() {
     );
   }
 
-  const client = getClientById(appointment.clientId);
-  const service = getServiceById(appointment.serviceId);
-  const statusInfo = statusConfig[appointment.status];
+  const client = clientData || {
+    first_name: appointment.client_name,
+    last_name: '',
+    id: appointment.client
+  };
+  const service = serviceData || {
+    name: appointment.service_name,
+    price: appointment.service_price,
+    duration: appointment.duration,
+    id: appointment.service
+  };
+  const statusInfo = statusConfig[appointment.status] || statusConfig.pending;
 
-  const handleStatusChange = async (newStatus: AppointmentStatus) => {
+  const appointmentDate = new Date(appointment.date);
+  const startTime = appointment.time ? appointment.time.substring(0, 5) : "00:00";
+
+  // Calculer l'heure de fin
+  let endTime = '-';
+  if (startTime) {
+    const duration = appointment.duration || service.duration || 0;
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes + duration;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+  }
+
+  const handleStatusChange = async (newStatus: string) => {
     setIsUpdatingStatus(true);
     try {
-      updateAppointmentStatus(appointment.id, newStatus);
+      // Utiliser l'action spécifique si possible, sinon patch générique
+      if (['confirm', 'start', 'complete'].includes(newStatus)) {
+        await apiClient.post(`/api/v1/appointments/${id}/${newStatus}/`);
+      } else {
+        await apiClient.patch(`/api/v1/appointments/${id}/`, { status: newStatus });
+      }
+
+      await fetchAppointment(); // Recharger les données
+
       toast({
         title: "Statut mis à jour",
-        description: `Le statut du rendez-vous a été changé en "${statusConfig[newStatus].label}".`,
+        description: `Le statut du rendez-vous a été mis à jour.`,
       });
     } catch (error) {
       toast({
@@ -192,16 +252,16 @@ export default function AppointmentDetailPage() {
 
     setIsDeleting(true);
     try {
-      // Simuler l'appel API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await apiClient.delete(`/api/v1/appointments/${id}/`);
+
       toast({
         title: "Rendez-vous supprimé",
         description: "Le rendez-vous a été supprimé avec succès.",
       });
-      
-      navigate('/appointments');
+
+      navigate('/admin/appointments');
     } catch (error) {
+      console.error('Erreur:', error);
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la suppression.",
@@ -212,7 +272,7 @@ export default function AppointmentDetailPage() {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!cancelReason) {
       toast({
         title: "Erreur",
@@ -221,25 +281,34 @@ export default function AppointmentDetailPage() {
       });
       return;
     }
-    
-    const updateData: Partial<Appointment> = {
-      cancellationReason: cancelReason as any,
-      cancellationNotes: cancelNotes || undefined,
-    };
-    
-    updateAppointmentStatus(appointment.id, 'cancelled', updateData);
-    
-    toast({
-      title: "Rendez-vous annulé",
-      description: "Le rendez-vous a été annulé avec succès.",
-    });
-    
-    setShowCancelDialog(false);
-    setCancelReason('');
-    setCancelNotes('');
+
+    try {
+      await apiClient.post(`/api/v1/appointments/${id}/cancel/`, {
+        reason: cancelReason,
+        notes: cancelNotes
+      });
+
+      await fetchAppointment();
+
+      toast({
+        title: "Rendez-vous annulé",
+        description: "Le rendez-vous a été annulé avec succès.",
+      });
+
+      setShowCancelDialog(false);
+      setCancelReason('');
+      setCancelNotes('');
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'annuler le rendez-vous.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleReschedule = () => {
+  const handleReschedule = async () => {
     if (!newDate || !newTime || !rescheduleReason) {
       toast({
         title: "Erreur",
@@ -248,34 +317,40 @@ export default function AppointmentDetailPage() {
       });
       return;
     }
-    
-    const newDateString = format(newDate, 'yyyy-MM-dd');
-    const updateData: Partial<Appointment> = {
-      originalDate: appointment.date,
-      originalStartTime: appointment.startTime,
-      date: newDateString,
-      startTime: newTime,
-      rescheduleReason: rescheduleReason as any,
-      rescheduleNotes: rescheduleNotes || undefined,
-    };
-    
-    updateAppointmentStatus(appointment.id, 'rescheduled', updateData);
-    
-    toast({
-      title: "Rendez-vous reporté",
-      description: `Le rendez-vous a été reporté au ${format(newDate, 'dd MMMM yyyy', { locale: fr })} à ${newTime}.`,
-    });
-    
-    setShowRescheduleDialog(false);
-    setRescheduleReason('');
-    setRescheduleNotes('');
-    setNewDate(undefined);
-    setNewTime('');
+
+    try {
+      const newDateString = format(newDate, 'yyyy-MM-dd');
+
+      await apiClient.post(`/api/v1/appointments/${id}/reschedule/`, {
+        new_date: newDateString,
+        new_time: newTime,
+        reason: rescheduleReason,
+        notes: rescheduleNotes
+      });
+
+      await fetchAppointment();
+
+      toast({
+        title: "Rendez-vous reporté",
+        description: `Le rendez-vous a été reporté au ${format(newDate, 'dd MMMM yyyy', { locale: fr })} à ${newTime}.`,
+      });
+
+      setShowRescheduleDialog(false);
+      setRescheduleReason('');
+      setRescheduleNotes('');
+      setNewDate(undefined);
+      setNewTime('');
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de reporter le rendez-vous.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const appointmentDate = new Date(appointment.date);
-  const startTime = appointment.startTime;
-  const endTime = appointment.endTime;
+
 
   return (
     <DashboardLayout>
@@ -323,7 +398,7 @@ export default function AppointmentDetailPage() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={handleDelete}
                   disabled={isDeleting}
                   className="text-destructive focus:text-destructive"
@@ -343,7 +418,7 @@ export default function AppointmentDetailPage() {
           transition={{ delay: 0.1 }}
           className="flex flex-wrap items-center gap-3"
         >
-          <Badge 
+          <Badge
             className={cn(
               "px-3 py-1.5 text-sm font-medium border flex items-center gap-2",
               statusInfo.className
@@ -352,23 +427,23 @@ export default function AppointmentDetailPage() {
             {statusInfo.icon}
             {statusInfo.label}
           </Badge>
-          
+
           {/* Actions rapides */}
           <div className="flex gap-2">
             {appointment.status !== 'completed' && appointment.status !== 'cancelled' && appointment.status !== 'rescheduled' && (
               <>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowRescheduleDialog(true)}
                   className="text-orange-600 border-orange-200 hover:bg-orange-50"
                 >
                   <CalendarClock className="w-4 h-4 mr-2" />
                   Reporter
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowCancelDialog(true)}
                   className="text-red-600 border-red-200 hover:bg-red-50"
                 >
@@ -457,9 +532,9 @@ export default function AppointmentDetailPage() {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-muted-foreground">Service</p>
                       <p className="text-sm font-semibold">{service?.name || 'Service introuvable'}</p>
-                      {service && (
+                      {service?.price && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {service.price.toLocaleString()} FCFA • {service.duration} min
+                          {service.price?.toLocaleString()} FCFA • {service.duration} min
                         </p>
                       )}
                     </div>
@@ -472,7 +547,7 @@ export default function AppointmentDetailPage() {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-muted-foreground">Montant</p>
                       <p className="text-sm font-semibold">
-                        {service ? `${service.price.toLocaleString()} FCFA` : 'N/A'}
+                        {service?.price ? `${service.price.toLocaleString()} FCFA` : 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -516,12 +591,12 @@ export default function AppointmentDetailPage() {
                   <>
                     <div className="flex items-center gap-3 pb-4 border-b border-border">
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                        {client.firstName[0]}{client.lastName[0]}
+                        {client.first_name?.[0] || '?'}{client.last_name?.[0] || '?'}
                       </div>
                       <div>
-                        <p className="font-semibold">{client.firstName} {client.lastName}</p>
-                        <Link 
-                          to={`/clients/${client.id}`}
+                        <p className="font-semibold">{client.first_name} {client.last_name}</p>
+                        <Link
+                          to={`/admin/clients/${client.id}`}
                           className="text-xs text-primary hover:underline"
                         >
                           Voir le profil
@@ -534,7 +609,7 @@ export default function AppointmentDetailPage() {
                         <Mail className="w-4 h-4 text-muted-foreground mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-muted-foreground">Email</p>
-                          <p className="text-sm truncate">{client.email}</p>
+                          <p className="text-sm truncate">{client.email || 'Non renseigné'}</p>
                         </div>
                       </div>
 
@@ -542,7 +617,7 @@ export default function AppointmentDetailPage() {
                         <Phone className="w-4 h-4 text-muted-foreground mt-0.5" />
                         <div className="flex-1">
                           <p className="text-xs text-muted-foreground">Téléphone</p>
-                          <p className="text-sm">{client.phone}</p>
+                          <p className="text-sm">{client.phone || 'Non renseigné'}</p>
                         </div>
                       </div>
 
@@ -590,7 +665,7 @@ export default function AppointmentDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Créé le</span>
                   <span>
-                    {format(new Date(appointment.createdAt), "d MMM yyyy à HH:mm", { locale: fr })}
+                    {appointment.createdAt ? format(new Date(appointment.createdAt), "d MMM yyyy à HH:mm", { locale: fr }) : 'Non disponible'}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -600,7 +675,7 @@ export default function AppointmentDetailPage() {
                 {appointment.source && (
                   <div className="flex justify-between items-center pt-2 border-t border-border">
                     <span className="text-muted-foreground">Source</span>
-                    <Badge 
+                    <Badge
                       className={cn(
                         "flex items-center gap-1",
                         appointment.source === 'whatsapp' && "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
@@ -637,29 +712,29 @@ export default function AppointmentDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start gap-2"
                   asChild
                 >
-                  <Link to={`/clients/${appointment.clientId}`}>
+                  <Link to={`/clients/${client.id}`}>
                     <User className="w-4 h-4" />
                     Voir le profil client
                   </Link>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start gap-2"
                   asChild
                 >
-                  <Link to={`/services/${appointment.serviceId}`}>
+                  <Link to={`/services/${service.id}`}>
                     <Scissors className="w-4 h-4" />
                     Voir le service
                   </Link>
                 </Button>
                 {appointment.status === 'pending' && (
-                  <Button 
-                    variant="default" 
+                  <Button
+                    variant="default"
                     className="w-full justify-start gap-2 bg-sidebar hover:bg-sidebar/90 text-sidebar-foreground"
                     onClick={() => handleStatusChange('confirmed')}
                     disabled={isUpdatingStatus}

@@ -1,0 +1,9 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "tunnel-back-naoservices",
+    "main": "index.ts",
+    "compatibility_date": "2024-12-19",
+    "observability": {
+        "enabled": true
+    }
+}

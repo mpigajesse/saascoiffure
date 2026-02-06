@@ -18,7 +18,7 @@ export default function ServiceDetailPage() {
   const { data: service, isLoading, isError } = useQuery<Service>({
     queryKey: ['service', id],
     queryFn: async () => {
-      const response = await apiClient.get(`/services/${id}/`);
+      const response = await apiClient.get(`/api/v1/services/${id}/`);
       return response.data;
     },
     enabled: !!id,
@@ -79,16 +79,25 @@ export default function ServiceDetailPage() {
         </div>
 
         {/* Image principale du service */}
-        <div className="relative h-96 rounded-xl overflow-hidden bg-secondary group">
+        <div className="relative h-[28rem] rounded-xl overflow-hidden bg-gradient-to-br from-muted/10 to-secondary/10 group">
           {service.image ? (
-            <motion.img
-              src={service.image}
-              alt={service.name}
-              className="w-full h-full object-cover"
-              initial={{ scale: 1.1 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.8 }}
-            />
+            <>
+              {/* Image floue en arrière-plan */}
+              <div
+                className="absolute inset-0 bg-cover bg-center filter blur-lg scale-110 opacity-30"
+                style={{ backgroundImage: `url(${service.image})` }}
+              />
+
+              {/* Image principale nette */}
+              <motion.img
+                src={service.image}
+                alt={service.name}
+                className="relative z-10 w-full h-full object-contain"
+                initial={{ scale: 1 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.8 }}
+              />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">
               <Scissors className="w-24 h-24 text-muted-foreground" />
@@ -150,8 +159,8 @@ export default function ServiceDetailPage() {
             </div>
 
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="gap-2"
                 onClick={() => navigate(`/services/${service.id}/edit`)}
               >
@@ -219,7 +228,7 @@ export default function ServiceDetailPage() {
                 </div>
                 <div className="p-4 bg-secondary/50 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-1">ID du salon</p>
-                  <p className="font-mono text-sm">{service.salonId}</p>
+                  <p className="font-mono text-sm">{service.salon || service.salonId}</p>
                 </div>
               </div>
             </div>

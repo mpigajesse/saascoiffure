@@ -3,8 +3,14 @@
  * Centralized API endpoints configuration
  */
 
-// Base URLs
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Detect if running via Cloudflare tunnel
+const isTunnel = typeof window !== 'undefined' && (
+  window.location.hostname.endsWith('.workers.dev') ||
+  window.location.hostname.endsWith('.trycloudflare.com')
+);
+
+// Base URLs - use relative /api path when via tunnel (Workers will proxy)
+export const API_BASE_URL = isTunnel ? '' : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000');
 export const API_VERSION = '/api/v1';
 export const BASE_API_URL = `${API_BASE_URL}${API_VERSION}`;
 

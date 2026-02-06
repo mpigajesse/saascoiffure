@@ -22,12 +22,25 @@ export default function TenantsPage() {
   const { data: salons = [], isLoading } = useQuery<Salon[]>({
     queryKey: ['salons'],
     queryFn: async () => {
-      const response = await apiClient.get('/salons/');
+      const response = await apiClient.get('/api/v1/salons/');
       // DRF peut retourner un objet paginé ou un tableau
       return Array.isArray(response.data) ? response.data : (response.data.results || []);
     },
     enabled: isSuperAdmin, // Ne faire la requête que si superadmin
   });
+
+  // Combiner le salon du superadmin avec les autres salons
+  // Le salon du superadmin doit toujours apparaître dans la liste
+  const allSalons = (() => {
+    const salonsList = [...salons];
+
+    // Ajouter le salon du superadmin s'il n'est pas déjà dans la liste
+    if (salon && !salonsList.find(s => s.id === salon.id)) {
+      salonsList.unshift(salon); // Ajouter en premier
+    }
+
+    return salonsList;
+  })();
 
   // Cette page est réservée aux super-admins pour gérer plusieurs salons
   // Les admins normaux gèrent leur propre salon via les paramètres
@@ -46,7 +59,7 @@ export default function TenantsPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Accès limité</AlertTitle>
             <AlertDescription>
-              Cette page est réservée aux super-administrateurs de la plateforme. 
+              Cette page est réservée aux super-administrateurs de la plateforme.
               En tant qu'administrateur de salon, vous pouvez gérer votre établissement via la page{' '}
               <Link to="/settings" className="font-medium text-primary hover:underline">
                 Paramètres
@@ -72,7 +85,7 @@ export default function TenantsPage() {
 
   // Fonctionnalité pour super-admin
   // Filtrer les salons selon la recherche
-  const filteredSalons = salons.filter(s =>
+  const filteredSalons = allSalons.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.address.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -122,18 +135,28 @@ export default function TenantsPage() {
                 key={s.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow"
+                className={cn(
+                  "bg-card border rounded-lg p-6 hover:shadow-lg transition-shadow",
+                  s.id === salon?.id && "border-primary/50 bg-primary/5"
+                )}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div 
+                    <div
                       className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
                       style={{ backgroundColor: s.primary_color || '#d97038' }}
                     >
                       {s.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">{s.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-lg">{s.name}</h3>
+                        {s.id === salon?.id && (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/20 text-primary border border-primary/30">
+                            Mon salon
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {s.is_active ? (
                           <span className="text-green-600">● Actif</span>

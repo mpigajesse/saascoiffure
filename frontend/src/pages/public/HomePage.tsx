@@ -2,8 +2,11 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Calendar, Scissors, Sparkles, ArrowRight, Clock, Banknote, Users, Star } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useServices } from '@/hooks/useApi';
+import { usePublicServices } from '@/hooks/usePublicApi';
+import { usePublicRoutes } from '@/hooks/usePublicRoutes';
+import { useEffect, useRef } from 'react';
 
 import heroImage from '@/assets/hero-salon.jpg';
 import { HeroSection } from '@/components/public/HeroSection';
@@ -18,11 +21,109 @@ import { AkomaSymbol, AfricanStarSymbol, SankofaSymbol } from '@/components/afri
 
 export default function HomePage() {
   const { salon } = useTenant();
-  const { data: servicesData } = useServices();
+  const { slug } = useParams<{ slug: string }>();
+  const routes = usePublicRoutes();
+  const isPublicRoute = !!slug;
+
+  // Use public API for slug routes, private for legacy /public routes
+  const privateServicesQuery = useServices();
+  const publicServicesQuery = usePublicServices();
+  const { data: servicesData } = isPublicRoute ? publicServicesQuery : privateServicesQuery;
+
   const services = servicesData?.results || [];
   const featuredServices = services.slice(0, 6);
   // Image du dashboard (ou image personnalisée du salon)
   const heroImageUrl = salon?.heroImage || heroImage;
+
+  // Auto-scroll logic
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const autoScrollInterval = useRef<NodeJS.Timeout | null>(null);
+  const isUserInteracting = useRef(false);
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel || featuredServices.length === 0) return;
+
+    const startAutoScroll = () => {
+      autoScrollInterval.current = setInterval(() => {
+        if (!isUserInteracting.current && carousel) {
+          const maxScroll = carousel.scrollWidth - carousel.clientWidth;
+          const currentScroll = carousel.scrollLeft;
+
+          // Si on est à la fin, revenir au début
+          if (currentScroll >= maxScroll - 10) {
+            carousel.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            // Adapter la distance de défilement selon la taille de l'écran
+            const isMobile = window.innerWidth < 768;
+            const scrollDistance = isMobile ? 280 : 340; // Plus petit sur mobile
+            carousel.scrollBy({ left: scrollDistance, behavior: 'smooth' });
+          }
+        }
+      }, 5000); // Défile toutes les 5 secondes
+    };
+
+    const stopAutoScroll = () => {
+      if (autoScrollInterval.current) {
+        clearInterval(autoScrollInterval.current);
+        autoScrollInterval.current = null;
+      }
+    };
+
+    const handleMouseEnter = () => {
+      isUserInteracting.current = true;
+      stopAutoScroll();
+    };
+
+    const handleMouseLeave = () => {
+      isUserInteracting.current = false;
+      startAutoScroll();
+    };
+
+    const handleTouchStart = () => {
+      isUserInteracting.current = true;
+      stopAutoScroll();
+    };
+
+    const handleTouchEnd = () => {
+      // Reprendre l'auto-scroll après 4 secondes d'inactivité (plus long sur mobile)
+      setTimeout(() => {
+        isUserInteracting.current = false;
+        startAutoScroll();
+      }, 4000);
+    };
+
+    const handleScroll = () => {
+      isUserInteracting.current = true;
+      stopAutoScroll();
+
+      // Reprendre l'auto-scroll après 4 secondes d'inactivité
+      setTimeout(() => {
+        isUserInteracting.current = false;
+        startAutoScroll();
+      }, 4000);
+    };
+
+    // Démarrer l'auto-scroll
+    startAutoScroll();
+
+    // Ajouter les event listeners
+    carousel.addEventListener('mouseenter', handleMouseEnter);
+    carousel.addEventListener('mouseleave', handleMouseLeave);
+    carousel.addEventListener('touchstart', handleTouchStart);
+    carousel.addEventListener('touchend', handleTouchEnd);
+    carousel.addEventListener('scroll', handleScroll);
+
+    // Cleanup
+    return () => {
+      stopAutoScroll();
+      carousel.removeEventListener('mouseenter', handleMouseEnter);
+      carousel.removeEventListener('mouseleave', handleMouseLeave);
+      carousel.removeEventListener('touchstart', handleTouchStart);
+      carousel.removeEventListener('touchend', handleTouchEnd);
+      carousel.removeEventListener('scroll', handleScroll);
+    };
+  }, [featuredServices.length]);
 
   return (
     <PublicLayout>
@@ -45,14 +146,14 @@ export default function HomePage() {
         description="Découvrez nos services de coiffure et prenez rendez-vous en ligne"
         actions={
           <>
-            <Link to="/public/booking">
+            <Link to={routes.booking}>
               <Button size="lg" className="gap-2 shadow-lg hover:shadow-glow-primary transition-all hover:scale-105">
                 <Calendar className="w-5 h-5" />
                 Réserver maintenant
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
-            <Link to="/public/services">
+            <Link to={routes.services}>
               <Button size="lg" variant="outline" className="gap-2 bg-background/10 backdrop-blur-sm border-background/30 text-background hover:bg-background/20">
                 <Scissors className="w-5 h-5" />
                 Voir nos services
@@ -73,8 +174,8 @@ export default function HomePage() {
         {/* Éléments décoratifs en arrière-plan */}
         <motion.div
           className="absolute top-20 left-10 text-primary/10"
-          animate={{ 
-            rotate: [0, 180, 360], 
+          animate={{
+            rotate: [0, 180, 360],
             scale: [1, 1.2, 1],
             y: [0, -30, 0]
           }}
@@ -82,11 +183,11 @@ export default function HomePage() {
         >
           <Scissors className="w-32 h-32" />
         </motion.div>
-        
+
         <motion.div
           className="absolute bottom-20 right-10 text-secondary/10"
-          animate={{ 
-            rotate: [360, 180, 0], 
+          animate={{
+            rotate: [360, 180, 0],
             scale: [1, 1.1, 1],
             y: [0, 20, 0]
           }}
@@ -94,10 +195,10 @@ export default function HomePage() {
         >
           <Clock className="w-24 h-24" />
         </motion.div>
-        
+
         <motion.div
           className="absolute top-1/2 left-1/4 text-yellow-500/10"
-          animate={{ 
+          animate={{
             scale: [1, 1.5, 1],
             opacity: [0.1, 0.3, 0.1]
           }}
@@ -117,7 +218,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 lg:px-8 relative z-10">
           {/* Header de section amélioré */}
           <AnimatedSection variant="fadeInUp" className="text-center mb-16">
-            <motion.div 
+            <motion.div
               className="flex items-center justify-center gap-4 mb-6"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -139,14 +240,14 @@ export default function HomePage() {
                 <AfricanStarSymbol size={40} animated={true} color="gradient" />
               </motion.div>
             </motion.div>
-            
-            <motion.p 
+
+            <motion.p
               className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
             >
-              Découvrez notre gamme complète de services de coiffure professionnels, 
+              Découvrez notre gamme complète de services de coiffure professionnels,
               conçus pour sublimer votre beauté et répondre à tous vos besoins
             </motion.p>
 
@@ -165,111 +266,62 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* Carousel Container - Réutilisation du code de la page Services */}
-              <div className="relative">
-                {/* Navigation buttons */}
-                <>
-                  <motion.button
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-card/90 backdrop-blur-sm text-foreground p-3 rounded-full shadow-lg border border-border/50"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => {
-                      const carousel = document.getElementById('home-services-carousel');
-                      carousel?.scrollBy({ left: -320, behavior: 'smooth' });
-                    }}
-                  >
-                    <ArrowRight className="w-5 h-5 rotate-180" />
-                  </motion.button>
-                  <motion.button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-card/90 backdrop-blur-sm text-foreground p-3 rounded-full shadow-lg border border-border/50"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => {
-                      const carousel = document.getElementById('home-services-carousel');
-                      carousel?.scrollBy({ left: 320, behavior: 'smooth' });
-                    }}
-                  >
-                    <ArrowRight className="w-5 h-5" />
-                  </motion.button>
-                </>
-                
-                {/* Carousel */}
-                <div 
+              {/* Carousel manuel avec navigation */}
+              <div className="relative group px-4 lg:px-12">
+                <motion.button
+                  className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30 bg-background/80 backdrop-blur-md text-foreground p-3 rounded-full shadow-xl border border-border/50 hover:bg-primary hover:text-primary-foreground transition-all opacity-0 group-hover:opacity-100 transform -translate-x-1/2"
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => document.getElementById('home-services-carousel')?.scrollBy({ left: -340, behavior: 'smooth' })}
+                >
+                  <ArrowRight className="w-6 h-6 rotate-180" />
+                </motion.button>
+                <motion.button
+                  className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30 bg-background/80 backdrop-blur-md text-foreground p-3 rounded-full shadow-xl border border-border/50 hover:bg-primary hover:text-primary-foreground transition-all opacity-0 group-hover:opacity-100 transform translate-x-1/2"
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => document.getElementById('home-services-carousel')?.scrollBy({ left: 340, behavior: 'smooth' })}
+                >
+                  <ArrowRight className="w-6 h-6" />
+                </motion.button>
+
+                <div
+                  ref={carouselRef}
                   id="home-services-carousel"
-                  className="flex gap-6 overflow-x-auto pb-6 px-12"
+                  className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory scroll-smooth"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
+                  <style>{`#home-services-carousel::-webkit-scrollbar { display: none; }`}</style>
+
                   {featuredServices.map((service, index) => {
                     const serviceImage = service.image || getServiceImage(service.id.toString(), 400, 300);
-                    
                     return (
                       <motion.div
                         key={service.id}
-                        initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                        whileInView={{ 
-                          opacity: 1, 
-                          scale: 1,
-                          y: 0,
-                          transition: { 
-                            delay: index * 0.1,
-                            duration: 0.5,
-                            type: "spring"
-                          }
-                        }}
-                        whileHover={{ 
-                          scale: 1.03,
-                          transition: { type: "spring", stiffness: 400 }
-                        }}
-                        className="flex-shrink-0 w-80"
-                        viewport={{ once: true }}
+                        className="flex-shrink-0 w-80 snap-center"
+                        whileHover={{ y: -10, transition: { type: "spring", stiffness: 300 } }}
                       >
-                        <div className="bg-card/80 backdrop-blur-sm border border-border/30 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
-                          {/* Image avec overlay */}
-                          <div className="relative h-44 overflow-hidden">
-                            <motion.img
-                              src={serviceImage}
-                              alt={service.name}
-                              className="w-full h-full object-cover"
-                              whileHover={{ scale: 1.1 }}
-                              transition={{ duration: 0.6 }}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                            
-                            {/* Badges */}
-                            <div className="absolute top-3 left-3 right-3 flex justify-between">
-                              {service.category_name && (
-                                <span
-                                  className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-md bg-primary"
-                                >
-                                  {service.category_name}
-                                </span>
-                              )}
+                        <div className="bg-card/80 backdrop-blur-sm border border-border/30 rounded-xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 h-full flex flex-col">
+                          <div className="relative h-52 overflow-hidden bg-gradient-to-br from-muted/10 to-secondary/10 group/card">
+                            <div className="absolute inset-0 bg-cover bg-center filter blur-lg scale-110 opacity-30" style={{ backgroundImage: `url(${serviceImage})` }} />
+                            <img src={serviceImage} alt={service.name} className="relative z-10 w-full h-full object-contain transition-transform duration-700 group-hover/card:scale-110" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
+                            <div className="absolute top-3 left-3 right-3 flex justify-between z-20">
+                              {service.category_name && <span className="px-3 py-1 text-xs font-bold rounded-full text-white shadow-lg bg-primary/90 backdrop-blur-sm">{service.category_name}</span>}
+                            </div>
+                            <div className="absolute bottom-3 right-3 z-20">
+                              <div className="px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5 shadow-lg">
+                                <Banknote className="w-3.5 h-3.5 text-accent" />
+                                <span className="font-bold text-white text-sm">{formatPrice(Number(service.price) || 0, salon?.currency)}</span>
+                              </div>
                             </div>
                           </div>
-                          
-                          {/* Contenu */}
-                          <div className="p-4">
-                            <h3 className="font-semibold text-base mb-2 group-hover:text-primary transition-colors">
-                              {service.name}
-                            </h3>
-                            
-                            {service.description && (
-                              <p className="text-xs text-muted-foreground mb-4 line-clamp-2">
-                                {service.description}
-                              </p>
-                            )}
-                            
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Banknote className="w-4 h-4 text-primary" />
-                                <span className="font-bold text-primary">{formatPrice(Number(service.price) || 0, salon?.currency)}</span>
-                              </div>
-                              
-                              <Link to="/public/booking">
-                                <Button size="sm" className="gap-1 shadow-sm hover:shadow-md">
-                                  Réserver
-                                  <ArrowRight className="w-3 h-3" />
-                                </Button>
+                          <div className="p-5 flex flex-col flex-1">
+                            <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors line-clamp-1">{service.name}</h3>
+                            {service.description && <p className="text-sm text-muted-foreground mb-4 line-clamp-2 flex-grow">{service.description}</p>}
+                            <div className="mt-auto pt-2">
+                              <Link to={routes.booking} state={{ serviceId: service.id }} className="block w-full">
+                                <Button className="w-full gap-2 shadow-sm hover:shadow-primary/50 transition-all font-semibold">Réserver<ArrowRight className="w-4 h-4" /></Button>
                               </Link>
                             </div>
                           </div>
@@ -277,12 +329,22 @@ export default function HomePage() {
                       </motion.div>
                     );
                   })}
+                  {featuredServices.length > 0 && (
+                    <div className="flex-shrink-0 w-48 snap-center flex items-center justify-center">
+                      <Link to={routes.services} className="group flex flex-col items-center gap-3 text-muted-foreground hover:text-primary transition-colors p-4">
+                        <div className="w-16 h-16 rounded-full bg-card border-2 border-dashed border-border group-hover:border-primary flex items-center justify-center transition-all group-hover:scale-110">
+                          <ArrowRight className="w-6 h-6" />
+                        </div>
+                        <span className="font-medium text-sm">Voir tout</span>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Bouton voir tous */}
               <div className="text-center mt-8">
-                <Link to="/public/services">
+                <Link to={routes.services}>
                   <Button size="lg" className="gap-2 shadow-lg hover:shadow-glow-primary">
                     Voir tous les services
                     <ArrowRight className="w-5 h-5" />
@@ -302,10 +364,10 @@ export default function HomePage() {
                 Explorez nos spécialités
               </p>
             </div>
-            
+
             {featuredServices.length > 0 && (
               <div className="flex flex-wrap justify-center gap-4">
-                <Link to="/public/services">
+                <Link to={routes.services}>
                   <motion.button
                     className="px-6 py-3 bg-card/60 backdrop-blur-sm border border-border rounded-full text-muted-foreground hover:border-primary hover:text-primary transition-all hover:shadow-md"
                     whileHover={{ scale: 1.05, y: -2 }}
@@ -331,7 +393,7 @@ export default function HomePage() {
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Excellence, professionnalisme et passion pour votre beauté
             </p>
-          </AnimatedSection> 
+          </AnimatedSection>
 
           <StaggerGrid columns={3}>
             {[
@@ -397,7 +459,7 @@ export default function HomePage() {
               <p className="text-xl text-white/95 max-w-2xl mx-auto drop-shadow-md">
                 Réservez votre créneau dès maintenant et laissez-nous prendre soin de vous
               </p>
-              <Link to="/public/booking">
+              <Link to={routes.booking}>
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}

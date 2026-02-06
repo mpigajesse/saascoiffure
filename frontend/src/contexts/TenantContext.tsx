@@ -19,16 +19,23 @@ interface TenantProviderProps {
   isPublic?: boolean;
 }
 
-export function TenantProvider({ 
-  children, 
+export function TenantProvider({
+  children,
   salon: providedSalon,
-  isPublic = false 
+  isPublic = false
 }: TenantProviderProps) {
   const [salon, setSalon] = useState<Salon | null>(providedSalon || null);
   const [isLoading, setIsLoading] = useState(!providedSalon);
-  
-  const { user } = useAuth();
-  
+
+  // Essayer d'obtenir l'utilisateur, mais ne pas échouer si AuthContext n'est pas disponible
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch {
+    // AuthContext pas encore disponible, on continue sans
+  }
+
   // Si on est en mode admin et qu'un tenant est sélectionné, utiliser ce tenant
   let adminContext;
   try {
@@ -39,18 +46,18 @@ export function TenantProvider({
   }
 
   useEffect(() => {
-    console.log('🏢 TenantContext useEffect:', { 
+    console.log('🏢 TenantContext useEffect:', {
       adminTenant: adminContext?.selectedTenant,
       providedSalon,
       userSalon: user?.salon_details
     });
-    
+
     // Priorité 1: Tenant sélectionné par l'admin
     if (adminContext?.selectedTenant) {
       console.log('📋 Utilisation salon admin:', adminContext.selectedTenant);
       setSalon(adminContext.selectedTenant);
       setIsLoading(false);
-    } 
+    }
     // Priorité 2: Salon fourni explicitement
     else if (providedSalon) {
       console.log('🏪 Utilisation salon fourni:', providedSalon);
@@ -73,7 +80,7 @@ export function TenantProvider({
     if (user?.salon_details?.id) {
       try {
         // Première tentative : récupérer les données via /auth/me/
-        const response = await apiClient.get('/auth/me/');
+        const response = await apiClient.get('/api/v1/auth/me/');
         if (response.data.salon_details) {
           setSalon(response.data.salon_details);
           return;
@@ -81,11 +88,11 @@ export function TenantProvider({
       } catch (error) {
         console.warn('Erreur avec /auth/me/, tentative alternative...', error);
       }
-      
+
       try {
         // Fallback : essayer l'endpoint direct du salon si il existe
         const salonId = user.salon_details.id;
-        const response = await apiClient.get(`/salons/${salonId}/`);
+        const response = await apiClient.get(`/api/v1/salons/${salonId}/`);
         setSalon(response.data);
       } catch (error) {
         console.error('Erreur lors du rafraîchissement du salon:', error);

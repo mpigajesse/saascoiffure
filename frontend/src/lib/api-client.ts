@@ -4,11 +4,11 @@
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { API_BASE_URL, API_VERSION } from '@/config/api';
+import { API_BASE_URL } from '@/config/api';
 
-// Create axios instance
+// Create axios instance - baseURL is just the host, endpoints include /api/v1
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: `${API_BASE_URL}${API_VERSION}`,
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ apiClient.interceptors.response.use(
         }
 
         // Try to refresh the token
-        const response = await axios.post(`${API_BASE_URL}${API_VERSION}/auth/token/refresh/`, {
+        const response = await axios.post(`${API_BASE_URL}/api/v1/auth/token/refresh/`, {
           refresh: refreshToken,
         });
 
@@ -72,6 +72,16 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+// Public API client - for unauthenticated requests (public booking, etc.)
+// This client doesn't add auth tokens and doesn't redirect on 401
+export const publicApiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
 // API Error type
 export interface ApiError {

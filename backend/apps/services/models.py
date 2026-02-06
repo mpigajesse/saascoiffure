@@ -77,12 +77,13 @@ class Service(TenantAwareModel):
         help_text='Durée estimée du service'
     )
     
-    # Image du service
+    # Image principale du service (conservée pour compatibilité)
     image = models.ImageField(
-        'Image',
+        'Image principale',
         upload_to='services/images/',
         null=True,
-        blank=True
+        blank=True,
+        help_text='Image principale affichée dans les listes'
     )
     
     # Disponibilité
@@ -117,3 +118,89 @@ class Service(TenantAwareModel):
         if hours > 0:
             return f"{hours}h{minutes:02d}" if minutes > 0 else f"{hours}h"
         return f"{minutes} min"
+    
+    @property
+    def main_image_url(self):
+        """URL de l'image principale"""
+        if self.image:
+            return self.image.url
+        # Fallback sur la première image de la galerie
+        first_image = self.images.filter(is_primary=True).first()
+        if not first_image:
+            first_image = self.images.first()
+        return first_image.image.url if first_image else None
+    
+    @property
+    def gallery_images(self):
+        """Toutes les images de la galerie"""
+        return self.images.all().order_by('order', 'id')
+
+
+class ServiceImage(TenantAwareModel):
+    """
+    Images multiples pour chaque service.
+    Permet d'avoir une galerie d'images pour chaque coiffure.
+    """
+    
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.CASCADE,
+        related_name='images',
+        verbose_name='Service'
+    )
+    
+    image = models.ImageField(
+        'Image',
+        upload_to='services/gallery/',
+        help_text='Images de la galerie du service'
+    )
+    
+    alt_text = models.CharField(
+        'Texte alternatif',
+        max_length=255,
+        blank=True,
+        help_text='Description de l\'image pour l\'accessibilité'
+    )
+    
+    is_primary = models.BooleanField(
+        'Image principale',
+        default=False,
+        help_text='Utilisée comme image de couverture'
+    )
+    
+    order = models.PositiveIntegerField(
+        'Ordre d\'affichage',
+        default=0,
+        help_text='Ordre d\'affichage dans la galerie'
+    )
+    
+    objects = TenantManager()
+    
+    class Meta:
+        db_table = 'service_images'
+        verbose_name = 'Image de service'
+        verbose_name_plural = 'Images de services'
+        ordering = ['service', 'order', 'id']
+        indexes = [
+            models.Index(fields=['salon', 'service']),
+            models.Index(fields=['service', 'is_primary']),
+        ]
+    
+    def __str__(self):
+        primary_text = " (Principale)" if self.is_primary else ""
+        return f"{self.service.name} - Image {self.order}{primary_text}"
+    
+    def save(self, *args, **kwargs):
+        # Si c'est marqué comme image principale, démarquer les autres
+        if self.is_primary:
+            ServiceImage.objects.filter(
+                salon=self.salon,
+                service=self.service,
+                is_primary=True
+            ).exclude(pk=self.pk).update(is_primary=False)
+        
+        # Auto-générer le texte alternatif si vide
+        if not self.alt_text:
+            self.alt_text = f"{self.service.name} - Vue {self.order or 'supplémentaire'}"
+            
+        super().save(*args, **kwargs)

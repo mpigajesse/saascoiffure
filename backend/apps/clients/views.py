@@ -20,6 +20,24 @@ class ClientViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [IsAuthenticated, IsSalonEmployee]
     
+    def _get_salon_for_superuser(self):
+        """Récupère le salon depuis le header X-Salon-Id pour les superusers"""
+        from apps.core.models import Salon
+        salon_id = self.request.headers.get('X-Salon-Id') or self.request.META.get('HTTP_X_SALON_ID')
+        if salon_id:
+            try:
+                return Salon.objects.get(id=salon_id)
+            except (Salon.DoesNotExist, ValueError):
+                pass
+        # Fallback to query param
+        salon_id = self.request.query_params.get('salon')
+        if salon_id:
+            try:
+                return Salon.objects.get(id=salon_id)
+            except (Salon.DoesNotExist, ValueError):
+                pass
+        return None
+    
     def get_queryset(self):
         """Filtre automatiquement par salon"""
         user = self.request.user
@@ -58,7 +76,16 @@ class ClientViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Associe automatiquement le salon"""
-        serializer.save(salon=self.request.salon)
+        salon = self.request.salon
+        # For superusers, get salon from header
+        if not salon and self.request.user.is_superuser:
+            salon = self._get_salon_for_superuser()
+        
+        if not salon:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"detail": "Aucun salon sélectionné. Veuillez sélectionner un salon dans le dashboard."})
+        
+        serializer.save(salon=salon)
     
     @action(detail=True, methods=['get'])
     def history(self, request, pk=None):

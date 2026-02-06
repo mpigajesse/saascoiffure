@@ -69,3 +69,7 @@ class Employee(TenantAwareModel):
         if self.specialties:
             return [s.strip() for s in self.specialties.split(',')]
         return []
+
+
+# Import du modèle de permissions personnalisées
+from .permissions_model import EmployeePermission

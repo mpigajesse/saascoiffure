@@ -2,9 +2,11 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Scissors, ArrowRight, Filter, Users, User, UserCircle, Baby, Sparkles, Clock, Star, Heart, Grid3x3, Layers, Eye, Banknote } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useServices, useServiceCategories } from '@/hooks/useApi';
+import { usePublicServices, usePublicServiceCategories } from '@/hooks/usePublicApi';
+import { usePublicRoutes } from '@/hooks/usePublicRoutes';
 import { AfricanStarSymbol } from '@/components/african-symbols/AfricanSymbols';
 import { formatPrice } from '@/lib/utils';
 
@@ -16,6 +18,10 @@ import { cn } from '@/lib/utils';
 
 export default function ServicesPage() {
   const { salon } = useTenant();
+  const { slug } = useParams<{ slug: string }>();
+  const routes = usePublicRoutes();
+  const isPublicRoute = !!slug; // If we have a slug in URL, use public API
+  
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedTarget, setSelectedTarget] = useState<string>('all');
   const [hoveredServiceId, setHoveredServiceId] = useState<string | number | null>(null);
@@ -23,9 +29,19 @@ export default function ServicesPage() {
   const [viewMode, setViewMode] = useState<'mosaic' | 'carousel'>('mosaic');
   const { scrollY } = useScroll();
   
-  // Récupération des données via API
-  const { data: servicesData, isLoading: servicesLoading } = useServices();
-  const { data: categoriesData, isLoading: categoriesLoading } = useServiceCategories();
+  // Récupération des données via API - use public or authenticated endpoints
+  const privateServicesQuery = useServices();
+  const privateCategsQuery = useServiceCategories();
+  const publicServicesQuery = usePublicServices();
+  const publicCategsQuery = usePublicServiceCategories();
+  
+  // Choose the right data source based on route type
+  const { data: servicesData, isLoading: servicesLoading } = isPublicRoute 
+    ? publicServicesQuery 
+    : privateServicesQuery;
+  const { data: categoriesData, isLoading: categoriesLoading } = isPublicRoute 
+    ? publicCategsQuery 
+    : privateCategsQuery;
   
   const services = servicesData?.results || [];
   const categories = categoriesData || [];
@@ -39,7 +55,7 @@ export default function ServicesPage() {
   
   // Fonction pour trouver une catégorie par ID
   const getCategoryById = (id: string | number) => {
-    return categories.find(cat => cat.id === id || cat.id === String(id));
+    return categories.find(cat => String(cat.id) === String(id));
   };
   
   // Parallax effects
@@ -51,10 +67,19 @@ export default function ServicesPage() {
   const heroImage = salon?.heroImage || getPageHeroImage('services', 1920, 1080);
 
   const filteredServices = services.filter(s => {
-    if (!(s.is_active ?? s.isActive) || !(s.is_published ?? s.isPublished)) return false;
+    // Gestion de la compatibilité des propriétés
+    const isActive = s.is_active !== undefined ? s.is_active : s.isActive;
+    const isPublished = s.is_published !== undefined ? s.is_published : s.isPublished;
+    
+    if (!isActive) return false;
+    // Si isPublished est défini, on le respecte, sinon on considère publié par défaut si actif
+    if (isPublished !== undefined && !isPublished) return false;
+
     const matchesCategory = selectedCategory === 'all' || 
-      (s.category && (String(s.category.id || s.category) === selectedCategory));
-    const matchesTarget = selectedTarget === 'all' || !s.target || s.target === selectedTarget;
+      (s.category !== undefined && String(s.category) === selectedCategory);
+      
+    const matchesTarget = selectedTarget === 'all' || !s.target || 
+      (selectedTarget === 'enfant' ? s.target.startsWith('enfant') : s.target === selectedTarget);
     return matchesCategory && matchesTarget;
   });
 
@@ -374,17 +399,17 @@ export default function ServicesPage() {
                       whileTap={{ scale: 0.95 }}
                     >
                       <Button
-                        variant={selectedCategory === category.id ? 'default' : 'outline'}
+                        variant={selectedCategory === String(category.id) ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedCategory(category.id)}
+                        onClick={() => setSelectedCategory(String(category.id))}
                         className={cn(
                           "h-8 text-xs px-3 transition-all",
-                          selectedCategory === category.id 
+                          selectedCategory === String(category.id) 
                             ? "shadow-lg scale-105" 
                             : "hover:shadow-md hover:scale-105"
                         )}
                         style={
-                          selectedCategory === category.id
+                          selectedCategory === String(category.id)
                             ? {
                                 backgroundColor: category.color,
                                 color: 'white',
@@ -398,7 +423,7 @@ export default function ServicesPage() {
                         <motion.div
                           className="w-2 h-2 rounded-full ml-1"
                           style={{ backgroundColor: category.color }}
-                          animate={selectedCategory === category.id ? { scale: [1, 1.5, 1] } : {}}
+                          animate={selectedCategory === String(category.id) ? { scale: [1, 1.5, 1] } : {}}
                           transition={{ duration: 0.3 }}
                         />
                       </Button>
@@ -576,7 +601,7 @@ export default function ServicesPage() {
                   >
                     <AnimatePresence>
                       {filteredServices.map((service, index) => {
-                        const category = service.category || getCategoryById(service.categoryId);
+                        const category = getCategoryById(service.category);
                         
                         return (
                           <motion.div
@@ -608,72 +633,94 @@ export default function ServicesPage() {
                             onMouseLeave={() => setHoveredServiceId(null)}
                             className="relative group"
                           >
-                            <div className="h-64 bg-card/80 backdrop-blur-sm border border-border/30 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
-                              {/* Image avec overlay */}
-                              <div className="relative h-40 overflow-hidden">
+                            <div className="aspect-[4/5] bg-card/80 backdrop-blur-sm border border-border/30 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col">
+                              {/* Image avec overlay - ratio professionnel salon */}
+                              <div className="relative flex-1 overflow-hidden bg-gradient-to-br from-muted/10 to-secondary/10">
+                                {/* Image floue en arrière-plan */}
+                                <div 
+                                  className="absolute inset-0 bg-cover filter blur-lg scale-110 opacity-30"
+                                  style={{ backgroundImage: `url(${service.image || getServiceImage(service.id, 400, 300)})`, objectPosition: 'center 25%' }}
+                                />
+                                
+                                {/* Image principale nette - cadrage buste + tête pro */}
                                 <motion.img
                                   src={service.image || getServiceImage(service.id, 400, 300)}
                                   alt={service.name}
-                                  className="w-full h-full object-cover"
-                                  whileHover={{ scale: 1.1 }}
+                                  className="relative z-10 w-full h-full object-contain"
+                                  style={{ objectPosition: 'center 25%' }}
+                                  whileHover={{ scale: 1.05 }}
                                   transition={{ duration: 0.6 }}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                                 
-                                {/* Badge catégorie */}
+                                {/* Actions au hover sur l'image uniquement */}
                                 <motion.div
-                                  className="absolute top-3 left-3"
-                                  initial={{ opacity: 0, x: -10 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: 0.1 }}
+                                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2"
+                                  initial={{ opacity: 0 }}
                                 >
+                                  <Link to={routes.serviceDetail(service.id)}>
+                                    <motion.div
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.9 }}
+                                      className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </motion.div>
+                                  </Link>
+                                  
+                                  <Link to={routes.booking} state={{ serviceId: service.id }}>
+                                    <motion.div
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.9 }}
+                                      className="w-10 h-10 bg-primary/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-white"
+                                    >
+                                      <ArrowRight className="w-4 h-4" />
+                                    </motion.div>
+                                  </Link>
+                                </motion.div>
+                              </div>
+                              
+                              {/* Contenu toujours visible - hauteur adaptative */}
+                              <div className="p-3 space-y-2">
+                                {/* Badges déplacés ici */}
+                                <div className="flex items-center gap-2">
                                   <span
-                                    className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-md"
+                                    className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm"
                                     style={{
                                       backgroundColor: category?.color || 'hsl(var(--primary))',
                                     }}
                                   >
                                     {category?.name || 'Service'}
                                   </span>
-                                </motion.div>
-                                
-                                {/* Badge type client */}
-                                {service.target && (
-                                  <motion.div
-                                    className="absolute top-3 right-3"
-                                    initial={{ opacity: 0, x: 10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.15 }}
-                                  >
+                                  
+                                  {service.target && (
                                     <span 
                                       className={cn(
-                                        "px-2 py-1 text-xs font-semibold rounded-full text-white shadow-md",
+                                        "px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm",
                                         service.target === 'homme' && "bg-blue-600",
                                         service.target === 'femme' && "bg-pink-600",
-                                        service.target === 'enfant' && "bg-yellow-600"
+                                        (service.target === 'enfant_fille' || service.target === 'enfant_garcon') && "bg-yellow-600"
                                       )}
                                     >
-                                      {service.target}
+                                      {service.target === 'enfant_fille' ? 'Fille' : 
+                                       service.target === 'enfant_garcon' ? 'Garçon' : 
+                                       service.target}
                                     </span>
-                                  </motion.div>
-                                )}
-                              </div>
-                              
-                              {/* Contenu */}
-                              <div className="p-4">
-                                <h3 className="font-semibold text-base mb-1 line-clamp-1 group-hover:text-primary transition-colors">
+                                  )}
+                                </div>
+                                
+                                <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
                                   {service.name}
                                 </h3>
                                 
                                 {service.description && (
-                                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                                  <p className="text-xs text-muted-foreground line-clamp-2 leading-tight">
                                     {service.description}
                                   </p>
                                 )}
                                 
                                 {/* Info bar */}
-                                <div className="flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                <div className="flex items-center justify-between text-xs pt-1">
+                                  <div className="flex items-center gap-1 text-muted-foreground">
                                     <Clock className="w-3 h-3" />
                                     <span>{service.duration}min</span>
                                   </div>
@@ -682,34 +729,32 @@ export default function ServicesPage() {
                                     <span>{formatPrice(Number(service.price) || 0, salon?.currency)}</span>
                                   </div>
                                 </div>
+                                
+                                {/* Boutons d'actions */}
+                                <div className="flex gap-2 pt-2">
+                                  <Link to={routes.serviceDetail(service.id)} className="flex-1">
+                                    <motion.button
+                                      whileHover={{ scale: 1.02 }}
+                                      whileTap={{ scale: 0.98 }}
+                                      className="w-full px-2 py-1.5 text-xs border border-border rounded-lg hover:bg-muted/50 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" />
+                                      Détails
+                                    </motion.button>
+                                  </Link>
+                                  <Link to={routes.booking} state={{ serviceId: service.id }} className="flex-1">
+                                    <motion.button
+                                      whileHover={{ scale: 1.02 }}
+                                      whileTap={{ scale: 0.98 }}
+                                      className="w-full px-2 py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                      <ArrowRight className="w-3 h-3" />
+                                      Réserver
+                                    </motion.button>
+                                  </Link>
+                                </div>
                               </div>
                             </div>
-                            
-                            {/* Actions au hover */}
-                            <motion.div
-                              className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 p-4"
-                              initial={{ opacity: 0 }}
-                            >
-                              <Link to={`/public/services/${service.id}`}>
-                                <motion.div
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                  className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </motion.div>
-                              </Link>
-                              
-                              <Link to="/public/booking" state={{ serviceId: service.id }}>
-                                <motion.div
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                  className="w-10 h-10 bg-primary/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-white"
-                                >
-                                  <ArrowRight className="w-4 h-4" />
-                                </motion.div>
-                              </Link>
-                            </motion.div>
                           </motion.div>
                         );
                       })}
@@ -762,7 +807,7 @@ export default function ServicesPage() {
                     >
                       <AnimatePresence>
                         {filteredServices.map((service, index) => {
-                          const category = service.category || getCategoryById(service.categoryId);
+                          const category = getCategoryById(service.category);
                           return (
                             <motion.div
                               key={service.id}
@@ -786,21 +831,31 @@ export default function ServicesPage() {
                               className="flex-shrink-0 w-80"
                             >
                               <div className="bg-card/80 backdrop-blur-sm border border-border/30 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
-                                {/* Image avec overlay */}
-                                <div className="relative h-44 overflow-hidden">
+                                {/* Image avec overlay - ratio professionnel salon */}
+                                <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-muted/10 to-secondary/10">
+                                  {/* Image floue en arrière-plan */}
+                                  <div 
+                                    className="absolute inset-0 bg-cover filter blur-lg scale-110 opacity-30"
+                                    style={{ backgroundImage: `url(${service.image || getServiceImage(service.id, 400, 300)})`, objectPosition: 'center 25%' }}
+                                  />
+                                  
+                                  {/* Image principale nette - cadrage buste + tête pro */}
                                   <motion.img
                                     src={service.image || getServiceImage(service.id, 400, 300)}
                                     alt={service.name}
-                                    className="w-full h-full object-cover"
-                                    whileHover={{ scale: 1.1 }}
+                                    className="relative z-10 w-full h-full object-contain"
+                                    style={{ objectPosition: 'center 25%' }}
+                                    whileHover={{ scale: 1.05 }}
                                     transition={{ duration: 0.6 }}
                                   />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                                  
-                                  {/* Badges */}
-                                  <div className="absolute top-3 left-3 right-3 flex justify-between">
+                                </div>
+                                
+                                {/* Contenu */}
+                                <div className="p-4">
+                                  {/* Badges déplacés ici */}
+                                  <div className="flex items-center gap-2 mb-2">
                                     <span
-                                      className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-md"
+                                      className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm"
                                       style={{
                                         backgroundColor: category?.color || 'hsl(var(--primary))',
                                       }}
@@ -811,22 +866,19 @@ export default function ServicesPage() {
                                     {service.target && (
                                       <span 
                                         className={cn(
-                                          "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white",
+                                          "px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm",
                                           service.target === 'homme' && "bg-blue-600",
                                           service.target === 'femme' && "bg-pink-600",
-                                          service.target === 'enfant' && "bg-yellow-600"
+                                          (service.target === 'enfant_fille' || service.target === 'enfant_garcon') && "bg-yellow-600"
                                         )}
                                       >
-                                        {service.target === 'homme' && 'H'}
-                                        {service.target === 'femme' && 'F'}
-                                        {service.target === 'enfant' && 'E'}
+                                        {service.target === 'enfant_fille' ? 'Fille' : 
+                                         service.target === 'enfant_garcon' ? 'Garçon' : 
+                                         service.target}
                                       </span>
                                     )}
                                   </div>
-                                </div>
-                                
-                                {/* Contenu */}
-                                <div className="p-4">
+                                  
                                   <h3 className="font-semibold text-base mb-2 group-hover:text-primary transition-colors">
                                     {service.name}
                                   </h3>
@@ -852,13 +904,13 @@ export default function ServicesPage() {
                                   </div>
                                   
                                   <div className="flex gap-2">
-                                    <Link to={`/public/services/${service.id}`} className="flex-1">
+                                    <Link to={routes.serviceDetail(service.id)} className="flex-1">
                                       <Button variant="outline" size="sm" className="w-full">
                                         <Eye className="w-3 h-3 mr-1" />
                                         Détails
                                       </Button>
                                     </Link>
-                                    <Link to="/public/booking" state={{ serviceId: service.id }} className="flex-1">
+                                    <Link to={routes.booking} state={{ serviceId: service.id }} className="flex-1">
                                       <Button size="sm" className="w-full">
                                         <ArrowRight className="w-3 h-3 mr-1" />
                                         Réserver
@@ -1010,7 +1062,7 @@ export default function ServicesPage() {
                   transition={{ delay: 1, duration: 0.6 }}
                   viewport={{ once: true }}
                 >
-                  <Link to="/public/contact">
+                  <Link to={routes.contact}>
                     <motion.div
                       className="relative overflow-hidden group"
                       whileHover={{ scale: 1.05 }}
@@ -1050,7 +1102,7 @@ export default function ServicesPage() {
                   transition={{ delay: 1.1, duration: 0.6 }}
                   viewport={{ once: true }}
                 >
-                  <Link to="/public/booking">
+                  <Link to={routes.booking}>
                     <motion.div
                       className="relative overflow-hidden group/booking"
                       whileHover={{ scale: 1.05 }}

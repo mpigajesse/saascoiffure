@@ -1,32 +1,64 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, X, User, Mail, Phone, MapPin, Calendar } from 'lucide-react';
-import { useAppointments } from '@/contexts/AppointmentsContext';
+import { ArrowLeft, Save, X, User, Mail, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AfricanStarSymbol } from '@/components/african-symbols/AfricanSymbols';
 import { toast } from '@/hooks/use-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api-client';
 
 export default function EditClientPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getClientById } = useAppointments();
-  const client = id ? getClientById(id) : null;
+  const queryClient = useQueryClient();
 
-  const [formData, setFormData] = useState({
-    firstName: client?.firstName || '',
-    lastName: client?.lastName || '',
-    email: client?.email || '',
-    phone: client?.phone || '',
-    preferences: client?.preferences || '',
-    notes: client?.notes || '',
+  const { data: client, isLoading } = useQuery({
+    queryKey: ['client', id],
+    queryFn: async () => {
+      const response = await apiClient.get(`/api/v1/clients/${id}/`);
+      return response.data;
+    },
+    enabled: !!id,
   });
 
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    preferences: '',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        firstName: client.first_name || '',
+        lastName: client.last_name || '',
+        email: client.email || '',
+        phone: client.phone || '',
+        preferences: client.preferences || '',
+        notes: client.notes || '',
+      });
+    }
+  }, [client]);
+
   const [isSaving, setIsSaving] = useState(false);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-[50vh]">
+          Chargement...
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (!client) {
     return (
@@ -48,16 +80,36 @@ export default function EditClientPage() {
     e.preventDefault();
     setIsSaving(true);
 
-    // Simulation d'enregistrement
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      await apiClient.patch(`/api/v1/clients/${id}/`, {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        preferences: formData.preferences,
+        notes: formData.notes
+      });
 
-    toast({
-      title: "Client modifié !",
-      description: "Les modifications ont été enregistrées avec succès.",
-    });
+      toast({
+        title: "Client modifié !",
+        description: "Les modifications ont été enregistrées avec succès.",
+      });
 
-    setIsSaving(false);
-    navigate(`/clients/${client.id}`);
+      // Invalider le cache pour recharger les données à jour
+      queryClient.invalidateQueries({ queryKey: ['client', id] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+
+      navigate(`/clients/${id}`);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le client.",
+        variant: "destructive"
+      });
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -94,7 +146,7 @@ export default function EditClientPage() {
                   <AfricanStarSymbol size={20} animated={true} color="gradient" />
                   Informations personnelles
                 </h2>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">Prénom *</Label>
@@ -131,15 +183,15 @@ export default function EditClientPage() {
                   <Label htmlFor="email">Email *</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        required
-                        className="pl-10"
-                        placeholder="Ex: awa.diallo@email.com"
-                      />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      className="pl-10"
+                      placeholder="Ex: awa.diallo@email.com"
+                    />
                   </div>
                 </div>
 
@@ -147,15 +199,15 @@ export default function EditClientPage() {
                   <Label htmlFor="phone">Téléphone *</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        required
-                        className="pl-10"
-                        placeholder="Ex: +241 06 12 34 56 78"
-                      />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      required
+                      className="pl-10"
+                      placeholder="Ex: +241 06 12 34 56 78"
+                    />
                   </div>
                 </div>
               </div>
@@ -163,7 +215,7 @@ export default function EditClientPage() {
               {/* Préférences et notes */}
               <div className="bg-card border border-border rounded-xl p-6 space-y-6">
                 <h2 className="text-xl font-bold">Informations complémentaires</h2>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="preferences">Préférences</Label>
                   <Textarea
@@ -199,7 +251,7 @@ export default function EditClientPage() {
               {/* Aperçu */}
               <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                 <h2 className="text-xl font-bold">Aperçu</h2>
-                
+
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 gradient-gabon flex items-center justify-center font-bold text-lg rounded-full">
@@ -229,7 +281,7 @@ export default function EditClientPage() {
               {/* Informations système */}
               <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                 <h2 className="text-xl font-bold">Informations système</h2>
-                
+
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">ID:</span>
