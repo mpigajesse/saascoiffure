@@ -38,90 +38,81 @@ export default function HomePage() {
   // Auto-scroll logic
   const carouselRef = useRef<HTMLDivElement>(null);
   const autoScrollInterval = useRef<NodeJS.Timeout | null>(null);
+  const restartTimeout = useRef<NodeJS.Timeout | null>(null);
   const isUserInteracting = useRef(false);
 
   useEffect(() => {
     const carousel = carouselRef.current;
     if (!carousel || featuredServices.length === 0) return;
 
-    const startAutoScroll = () => {
-      autoScrollInterval.current = setInterval(() => {
-        if (!isUserInteracting.current && carousel) {
-          const maxScroll = carousel.scrollWidth - carousel.clientWidth;
-          const currentScroll = carousel.scrollLeft;
-
-          // Si on est à la fin, revenir au début
-          if (currentScroll >= maxScroll - 10) {
-            carousel.scrollTo({ left: 0, behavior: 'smooth' });
-          } else {
-            // Adapter la distance de défilement selon la taille de l'écran
-            const isMobile = window.innerWidth < 768;
-            const scrollDistance = isMobile ? 280 : 340; // Plus petit sur mobile
-            carousel.scrollBy({ left: scrollDistance, behavior: 'smooth' });
-          }
-        }
-      }, 5000); // Défile toutes les 5 secondes
-    };
-
-    const stopAutoScroll = () => {
+    const clearTimers = () => {
       if (autoScrollInterval.current) {
         clearInterval(autoScrollInterval.current);
         autoScrollInterval.current = null;
       }
+      if (restartTimeout.current) {
+        clearTimeout(restartTimeout.current);
+        restartTimeout.current = null;
+      }
     };
 
-    const handleMouseEnter = () => {
+    const startAutoScroll = () => {
+      // Éviter les duplications d'intervalle
+      if (autoScrollInterval.current) return;
+
+      autoScrollInterval.current = setInterval(() => {
+        // Vérifier si le document est visible pour éviter les comportements étranges en arrière-plan
+        if (!isUserInteracting.current && carousel && !document.hidden) {
+          const maxScroll = carousel.scrollWidth - carousel.clientWidth;
+          const currentScroll = carousel.scrollLeft;
+
+          // Si on est à la fin, revenir au début proprement
+          if (currentScroll >= maxScroll - 20) {
+            carousel.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            // Adapter la distance de défilement pour matcher la largeur d'une carte + gap
+            const scrollDistance = 340; // w-80 (320px) + gap-6 (24px) ~ 344px
+            carousel.scrollBy({ left: scrollDistance, behavior: 'smooth' });
+          }
+        }
+      }, 5000); // Intervalle plus lent (5s) pour plus de calme
+    };
+
+    const handleInteractionStart = () => {
       isUserInteracting.current = true;
-      stopAutoScroll();
+      clearTimers();
     };
 
-    const handleMouseLeave = () => {
-      isUserInteracting.current = false;
-      startAutoScroll();
-    };
-
-    const handleTouchStart = () => {
-      isUserInteracting.current = true;
-      stopAutoScroll();
-    };
-
-    const handleTouchEnd = () => {
-      // Reprendre l'auto-scroll après 4 secondes d'inactivité (plus long sur mobile)
-      setTimeout(() => {
+    const handleInteractionEnd = () => {
+      clearTimers();
+      // Reprendre l'auto-scroll après un délai plus long (8s) pour laisser le temps de lire/finir le geste
+      restartTimeout.current = setTimeout(() => {
         isUserInteracting.current = false;
         startAutoScroll();
-      }, 4000);
+      }, 8000);
     };
 
-    const handleScroll = () => {
-      isUserInteracting.current = true;
-      stopAutoScroll();
-
-      // Reprendre l'auto-scroll après 4 secondes d'inactivité
-      setTimeout(() => {
-        isUserInteracting.current = false;
-        startAutoScroll();
-      }, 4000);
-    };
-
-    // Démarrer l'auto-scroll
+    // Démarrer initialement
     startAutoScroll();
 
-    // Ajouter les event listeners
-    carousel.addEventListener('mouseenter', handleMouseEnter);
-    carousel.addEventListener('mouseleave', handleMouseLeave);
-    carousel.addEventListener('touchstart', handleTouchStart);
-    carousel.addEventListener('touchend', handleTouchEnd);
-    carousel.addEventListener('scroll', handleScroll);
+    // Event listeners simplifiés et plus robustes
+    // On écoute aussi 'touchmove' pour être sûr de détecter le scroll continu sur mobile
+    carousel.addEventListener('mouseenter', handleInteractionStart);
+    carousel.addEventListener('mouseleave', handleInteractionEnd);
+    carousel.addEventListener('touchstart', handleInteractionStart, { passive: true });
+    carousel.addEventListener('touchmove', handleInteractionStart, { passive: true });
+    carousel.addEventListener('touchend', handleInteractionEnd);
+    // On retire 'scroll' car il cause des boucles de feedback avec le smooth scroll automatique 
+    // et l'interaction utilisateur est déjà bien couverte par hover/touch
 
     // Cleanup
     return () => {
-      stopAutoScroll();
-      carousel.removeEventListener('mouseenter', handleMouseEnter);
-      carousel.removeEventListener('mouseleave', handleMouseLeave);
-      carousel.removeEventListener('touchstart', handleTouchStart);
-      carousel.removeEventListener('touchend', handleTouchEnd);
-      carousel.removeEventListener('scroll', handleScroll);
+      clearTimers();
+      carousel.removeEventListener('mouseenter', handleInteractionStart);
+      carousel.removeEventListener('mouseleave', handleInteractionEnd);
+      carousel.removeEventListener('touchstart', handleInteractionStart);
+      carousel.removeEventListener('touchmove', handleInteractionStart);
+      carousel.removeEventListener('touchend', handleInteractionEnd);
     };
   }, [featuredServices.length]);
 
