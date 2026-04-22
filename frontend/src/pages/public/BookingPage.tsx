@@ -1,14 +1,15 @@
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useTenant } from '@/contexts/TenantContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import { publicApiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar, Clock, User, Phone, Mail, Scissors, CheckCircle2, ArrowRight, Banknote, Smartphone, CreditCard, Wallet, MessageCircle, Sparkles, Star, Heart, Download } from 'lucide-react';
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useServices, useEmployees } from '@/hooks/useApi';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { usePublicServices, usePublicEmployees, useAvailableSlots } from '@/hooks/usePublicApi';
+import { usePublicRoutes } from '@/hooks/usePublicRoutes';
 import { HeroSection } from '@/components/public/HeroSection';
 import { getPageHeroImage, getServiceImage } from '@/lib/unsplash';
 import { motion } from 'framer-motion';
@@ -38,29 +39,20 @@ import { toast } from '@/hooks/use-toast';
 
 export default function BookingPage() {
   const { salon } = useTenant();
+  const { slug } = useParams<{ slug?: string }>();
+  const routes = usePublicRoutes();
+  const isPublicRoute = !!slug;
+
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
-  const preSelectedServiceId = location.state?.serviceId;
+  // Ensure serviceId is always a string to avoid comparison issues
+  const preSelectedServiceId = location.state?.serviceId ? String(location.state.serviceId) : '';
 
-  // Mutations pour créer des entités
-  const createClientMutation = useMutation({
-    mutationFn: async (clientData: any) => {
-      const response = await apiClient.post('/clients/', clientData);
-      return response.data;
-    },
-  });
-
-  const createAppointmentMutation = useMutation({
-    mutationFn: async (appointmentData: any) => {
-      const response = await apiClient.post('/appointments/', appointmentData);
-      return response.data;
-    },
-  });
-
-  const createPaymentMutation = useMutation({
-    mutationFn: async (paymentData: any) => {
-      const response = await apiClient.post('/payments/', paymentData);
+  // Mutation unifiée pour créer une réservation complète
+  const createBookingMutation = useMutation({
+    mutationFn: async (bookingData: any) => {
+      const response = await publicApiClient.post('/api/v1/public/booking/create/', bookingData);
       return response.data;
     },
   });
@@ -68,12 +60,40 @@ export default function BookingPage() {
   // Fonction pour vérifier si un client existe par email
   const checkClientByEmail = async (email: string) => {
     try {
-      const response = await apiClient.get(`/clients/?email=${email}`);
-      const clients = Array.isArray(response.data) ? response.data : (response.data.results || []);
-      return clients.length > 0 ? clients[0] : null;
+      const response = await publicApiClient.get(`/api/v1/public/booking/check-client/?email=${email}&salon_slug=${slug}`);
+      return response.data.exists ? response.data.client : null;
     } catch (error) {
       return null;
     }
+  };
+
+  // Fonction de validation du numéro gabonais
+  const validateGabonPhone = (phone: string): boolean => {
+    if (!phone) return false; // Requis pour la réservation
+
+    // Nettoyer le numéro (enlever espaces, tirets et points)
+    const cleaned = phone.replace(/[\s\-\.]/g, '');
+
+    // Nouveau format (9 chiffres):
+    // Moov: 062, 063, 065, 066 + 6 chiffres
+    // Airtel: 074, 077 + 6 chiffres
+    const moovPattern = /^0(62|63|65|66)\d{6}$/;
+    const airtelPattern = /^0(74|77)\d{6}$/;
+
+    // Format international
+    const moovInternational = /^\+2410(62|63|65|66)\d{6}$/;
+    const airtelInternational = /^\+2410(74|77)\d{6}$/;
+
+    // Ancien format (8 chiffres) - accepté pour migration
+    const oldMoovPattern = /^06\d{6}$/;
+    const oldAirtelPattern = /^07\d{6}$/;
+
+    return moovPattern.test(cleaned) ||
+      airtelPattern.test(cleaned) ||
+      moovInternational.test(cleaned) ||
+      airtelInternational.test(cleaned) ||
+      oldMoovPattern.test(cleaned) ||
+      oldAirtelPattern.test(cleaned);
   };
 
   const [formData, setFormData] = useState({
@@ -96,22 +116,28 @@ export default function BookingPage() {
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
 
-  // Fetch data from API
-  const { data: servicesData } = useServices();
-  const { data: employeesData } = useEmployees();
-  
+  // Fetch data from public API (no authentication required)
+  const { data: servicesData } = usePublicServices();
+  const { data: employeesData } = usePublicEmployees();
+
   const services = servicesData?.results || [];
   const employees = employeesData?.results || [];
-  const coiffeurs = employees.filter(e => e.role === 'COIFFEUR');
-  
+  // Filtrage robuste insensible à la casse pour le rôle
+  const coiffeurs = employees.filter(e => e.role && e.role.toUpperCase() === 'COIFFEUR');
+
   const selectedService = formData.serviceId ? services.find(s => s.id.toString() === formData.serviceId) : null;
   const selectedEmployee = formData.employeeId ? coiffeurs.find(e => e.id.toString() === formData.employeeId) : null;
 
-  const timeSlots = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '14:00', '14:30', '15:00', '15:30',
-    '16:00', '16:30', '17:00', '17:30', '18:00', '18:30'
-  ];
+  // Fetch available time slots based on employee, date, and service
+  const formattedDate = formData.date ? format(formData.date, 'yyyy-MM-dd') : undefined;
+  const { data: slotsData, isLoading: isSlotsLoading } = useAvailableSlots(
+    formData.employeeId,
+    formattedDate,
+    formData.serviceId
+  );
+
+  // Use dynamic slots from API, fallback to default if not available
+  const timeSlots = slotsData?.slots || [];
 
   const downloadTicket = () => {
     if (!createdAppointment || !selectedService) return;
@@ -158,22 +184,22 @@ export default function BookingPage() {
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(reservationData)}`;
     const qrImage = new Image();
     qrImage.crossOrigin = 'anonymous';
-    
+
     qrImage.onload = () => {
       // Dessiner le QR code dans un coin avec fond blanc
       const qrSize = 120;
       const qrX = canvas.width - qrSize - 40;
       const qrY = 190;
-      
+
       // Fond blanc pour le QR code
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
-      
+
       // Bordure autour du QR code
       ctx.strokeStyle = '#d97038';
       ctx.lineWidth = 3;
       ctx.strokeRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
-      
+
       // Dessiner le QR code
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
@@ -252,7 +278,7 @@ export default function BookingPage() {
       ctx.fillText('Paiement:', leftCol, yPos);
       ctx.font = '22px Arial';
       ctx.fillStyle = '#2d1810';
-      const paymentText = formData.paymentMethod === 'airtel_money' 
+      const paymentText = formData.paymentMethod === 'airtel_money'
         ? `Airtel Money (${formData.airtelMoneyNumber})`
         : 'À l\'arrivée au salon';
       ctx.fillText(paymentText, leftCol, yPos + 35);
@@ -290,48 +316,58 @@ export default function BookingPage() {
     setIsSubmitting(true);
 
     try {
-      // Vérifier si le client existe déjà
-      let client = await checkClientByEmail(formData.email);
-
-      // Si le client n'existe pas, le créer
-      if (!client) {
-        client = await createClientMutation.mutateAsync({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          notes: formData.notes || undefined,
-        });
-      }
-
-      // Créer la réservation (sans paiement pour l'instant)
       const dateString = formData.date ? format(formData.date, 'yyyy-MM-dd') : '';
 
-      const appointment = await createAppointmentMutation.mutateAsync({
-        salon: salon?.id || 0,
-        client: client.id,
-        employee: formData.employeeId,
-        service: formData.serviceId,
+      // Utiliser l'endpoint unifié de réservation
+      const result = await createBookingMutation.mutateAsync({
+        salon_slug: slug,
+        service_id: formData.serviceId,
+        employee_id: formData.employeeId || null,
         date: dateString,
-        start_time: formData.time,
-        notes: formData.notes || undefined,
-        source: 'website', // Source de la réservation
+        time: formData.time,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        notes: formData.notes || '',
+        payment_method: formData.paymentMethod || null,
       });
 
-      setCreatedAppointment(appointment);
+      setCreatedAppointment(result.booking);
 
       // Simulation d'un délai pour l'UX
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       setIsSubmitting(false);
-      setStep(4); // Passer à l'étape de paiement
-    } catch (error) {
+
+      // Si paiement cash, passer directement à la confirmation
+      if (formData.paymentMethod === 'cash_on_arrival' || !formData.paymentMethod) {
+        setStep(5); // Confirmation finale
+      } else {
+        setStep(4); // Étape de paiement mobile
+      }
+    } catch (error: any) {
       console.error('Erreur lors de la création de la réservation:', error);
-      toast({
-        title: "Erreur",
-        description: "Une erreur est survenue lors de la création de votre réservation. Veuillez réessayer.",
-        variant: "destructive",
-      });
+
+      // Check if the error is about slot unavailability (409 Conflict)
+      const errorCode = error?.response?.data?.code;
+      const errorMessage = error?.response?.data?.error;
+
+      if (errorCode === 'SLOT_UNAVAILABLE' || error?.response?.status === 409) {
+        toast({
+          title: "Créneau non disponible",
+          description: errorMessage || "Ce créneau n'est plus disponible. Veuillez en choisir un autre.",
+          variant: "destructive",
+        });
+        // Reset time selection and refresh available slots
+        setFormData(prev => ({ ...prev, time: '' }));
+      } else {
+        toast({
+          title: "Erreur",
+          description: errorMessage || "Une erreur est survenue lors de la création de votre réservation. Veuillez réessayer.",
+          variant: "destructive",
+        });
+      }
       setIsSubmitting(false);
     }
   };
@@ -356,16 +392,8 @@ export default function BookingPage() {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
-      // Créer le paiement
-      if (createdAppointment && selectedService) {
-        await createPaymentMutation.mutateAsync({
-          salon: salon?.id || 0,
-          appointment: createdAppointment.id,
-          client: createdAppointment.client,
-          amount: Number(selectedService.price) || 0,
-          method: formData.paymentMethod as 'airtel_money' | 'cash_on_arrival',
-        });
-      }
+      // Le paiement a déjà été créé lors de la réservation
+      // Ici on simule juste la confirmation du paiement mobile
 
       toast({
         title: "Paiement confirmé !",
@@ -387,7 +415,7 @@ export default function BookingPage() {
     }
   };
 
-  const canProceedToStep2 = formData.firstName && formData.lastName && formData.email && formData.phone;
+  const canProceedToStep2 = formData.firstName && formData.lastName && formData.email && formData.phone && validateGabonPhone(formData.phone);
   const canProceedToStep3 = canProceedToStep2 && formData.serviceId && formData.employeeId;
   const canProceedToStep4 = canProceedToStep3 && formData.date && formData.time;
   const canSubmitPayment = canProceedToStep4 && formData.paymentMethod &&
@@ -404,7 +432,7 @@ export default function BookingPage() {
             <div className="absolute bottom-10 right-10 w-64 h-64 bg-accent/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }} />
           </div>
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
@@ -414,7 +442,7 @@ export default function BookingPage() {
             <div className="bg-card/80 backdrop-blur-xl border-2 border-primary/20 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden">
               {/* Header avec confetti visuel */}
               <div className="relative bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4 text-center border-b border-primary/20">
-                <motion.div 
+                <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
@@ -427,8 +455,8 @@ export default function BookingPage() {
                     </div>
                   </div>
                 </motion.div>
-                
-                <motion.div 
+
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
@@ -438,8 +466,8 @@ export default function BookingPage() {
                   <Star className="w-5 h-5 text-yellow-500 animate-pulse" style={{ animationDelay: '0.2s' }} />
                   <Heart className="w-5 h-5 text-pink-500 animate-pulse" style={{ animationDelay: '0.4s' }} />
                 </motion.div>
-                
-                <motion.h2 
+
+                <motion.h2
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
@@ -447,8 +475,8 @@ export default function BookingPage() {
                 >
                   Réservation confirmée !
                 </motion.h2>
-                
-                <motion.p 
+
+                <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5 }}
@@ -474,7 +502,7 @@ export default function BookingPage() {
                   </h3>
                   <div className="grid grid-cols-2 gap-2">
                     {/* Service */}
-                    <motion.div 
+                    <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="bg-secondary/30 rounded-lg p-2 border border-border/50"
                     >
@@ -486,7 +514,7 @@ export default function BookingPage() {
                     </motion.div>
 
                     {/* Date */}
-                    <motion.div 
+                    <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="bg-secondary/30 rounded-lg p-2 border border-border/50"
                     >
@@ -500,7 +528,7 @@ export default function BookingPage() {
                     </motion.div>
 
                     {/* Heure */}
-                    <motion.div 
+                    <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="bg-secondary/30 rounded-lg p-2 border border-border/50"
                     >
@@ -512,7 +540,7 @@ export default function BookingPage() {
                     </motion.div>
 
                     {/* Montant */}
-                    <motion.div 
+                    <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="bg-gradient-to-br from-primary/10 to-accent/5 rounded-lg p-2 border border-primary/30"
                     >
@@ -570,7 +598,7 @@ export default function BookingPage() {
                 )}
 
                 {/* Actions */}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.9 }}
@@ -589,7 +617,7 @@ export default function BookingPage() {
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="outline"
-                      onClick={() => window.location.href = '/public/services'}
+                      onClick={() => navigate(routes.services)}
                       className="flex-1 h-9 gap-2 hover:bg-secondary hover:scale-105 transition-all shadow-sm text-xs"
                     >
                       <Scissors className="w-3 h-3" />
@@ -597,7 +625,7 @@ export default function BookingPage() {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => window.location.href = '/public'}
+                      onClick={() => navigate(routes.home)}
                       className="flex-1 h-9 gap-2 hover:bg-secondary hover:scale-105 transition-all shadow-sm text-xs"
                     >
                       <CheckCircle2 className="w-3 h-3" />
@@ -765,10 +793,16 @@ export default function BookingPage() {
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           required
-                          placeholder="Ex: +241 06 12 34 56"
-                          className="pl-10 h-10 bg-background border-input focus:ring-2 focus:ring-primary/20 transition-all"
+                          placeholder="Ex: 074 12 34 56 ou 062 12 34 56"
+                          className={`pl-10 h-10 bg-background border-input focus:ring-2 focus:ring-primary/20 transition-all ${formData.phone && !validateGabonPhone(formData.phone) ? 'border-destructive' : ''
+                            }`}
                         />
                       </div>
+                      {formData.phone && !validateGabonPhone(formData.phone) && (
+                        <p className="text-xs text-destructive">
+                          Moov: 062/063/065/066 XX XX XX, Airtel: 074/077 XX XX XX
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex justify-end pt-3">
@@ -839,7 +873,7 @@ export default function BookingPage() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setFormData({ ...formData, serviceId: service.id.toString() });
+                                    setFormData({ ...formData, serviceId: service.id.toString(), time: '' });
                                     setIsServiceModalOpen(false);
                                   }}
                                   className={cn(
@@ -850,11 +884,11 @@ export default function BookingPage() {
                                   )}
                                 >
                                   <div className="flex gap-4">
-                                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-secondary">
+                                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-muted/10 to-secondary/10">
                                       <img
                                         src={service.image || getServiceImage(service.id.toString(), 200, 200)}
                                         alt={service.name}
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-contain bg-gradient-to-br from-muted/5 to-secondary/5"
                                       />
                                     </div>
                                     <div className="flex-1">
@@ -887,11 +921,18 @@ export default function BookingPage() {
                           animate={{ opacity: 1, height: 'auto' }}
                           className="bg-secondary/30 border border-secondary rounded-xl p-4 flex gap-4 items-center"
                         >
-                          <div className="w-16 h-16 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
+                          <div className="w-16 h-16 rounded-lg bg-secondary overflow-hidden flex-shrink-0 relative">
+                            {/* Image floue en arrière-plan */}
+                            <div
+                              className="absolute inset-0 bg-cover bg-center filter blur-sm scale-110 opacity-40"
+                              style={{ backgroundImage: `url(${selectedService.image || getServiceImage(selectedService.id.toString(), 100, 100)})` }}
+                            />
+
+                            {/* Image principale nette */}
                             <img
                               src={selectedService.image || getServiceImage(selectedService.id.toString(), 100, 100)}
                               alt={selectedService.name}
-                              className="w-full h-full object-cover"
+                              className="relative z-10 w-full h-full object-contain"
                             />
                           </div>
                           <div className="flex-1">
@@ -945,7 +986,7 @@ export default function BookingPage() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setFormData({ ...formData, employeeId: emp.id.toString() });
+                                    setFormData({ ...formData, employeeId: emp.id.toString(), time: '' });
                                     setIsEmployeeModalOpen(false);
                                   }}
                                   className={cn(
@@ -1041,7 +1082,7 @@ export default function BookingPage() {
                             <CalendarComponent
                               mode="single"
                               selected={formData.date}
-                              onSelect={(date) => setFormData({ ...formData, date: date })}
+                              onSelect={(date) => setFormData({ ...formData, date: date, time: '' })}
                               disabled={(date) => date < new Date()}
                               initialFocus
                               className="p-3"
@@ -1054,19 +1095,40 @@ export default function BookingPage() {
                         <Select
                           value={formData.time}
                           onValueChange={(value) => setFormData({ ...formData, time: value })}
+                          disabled={!formData.employeeId || !formData.date}
                         >
                           <SelectTrigger className="h-11 border-input focus:ring-2 focus:ring-primary/20 bg-background text-sm shadow-sm">
                             <div className="flex items-center gap-3">
                               <Clock className="w-5 h-5 text-muted-foreground" />
-                              <SelectValue placeholder="Choisir une heure" />
+                              <SelectValue placeholder={
+                                !formData.employeeId
+                                  ? "Sélectionnez d'abord un coiffeur"
+                                  : !formData.date
+                                    ? "Sélectionnez d'abord une date"
+                                    : isSlotsLoading
+                                      ? "Chargement..."
+                                      : timeSlots.length === 0
+                                        ? "Aucun créneau disponible"
+                                        : "Choisir une heure"
+                              } />
                             </div>
                           </SelectTrigger>
                           <SelectContent className="max-h-[300px]">
-                            {timeSlots.map((time) => (
-                              <SelectItem key={time} value={time} className="cursor-pointer">
-                                {time}
-                              </SelectItem>
-                            ))}
+                            {isSlotsLoading ? (
+                              <div className="p-4 text-center text-muted-foreground">
+                                Chargement des créneaux...
+                              </div>
+                            ) : timeSlots.length === 0 ? (
+                              <div className="p-4 text-center text-muted-foreground">
+                                Aucun créneau disponible pour cette date
+                              </div>
+                            ) : (
+                              timeSlots.map((time) => (
+                                <SelectItem key={time} value={time} className="cursor-pointer">
+                                  {time}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1261,28 +1323,64 @@ export default function BookingPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5"
                   >
-                    <div className="h-48 relative overflow-hidden group">
-                      <motion.img
-                        src={selectedService.image || getServiceImage(selectedService.id.toString(), 600, 400)}
-                        alt={selectedService.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    {/* Conteneur image centré avec padding */}
+                    <div className="pt-6 px-6">
+                      <div className="aspect-[4/5] w-3/4 mx-auto relative overflow-hidden group bg-gradient-to-br from-muted/10 to-secondary/10 rounded-xl shadow-md">
+                        {/* Image floue en arrière-plan */}
+                        <div
+                          className="absolute inset-0 bg-cover filter blur-lg scale-110 opacity-30"
+                          style={{ backgroundImage: `url(${selectedService.image || getServiceImage(selectedService.id.toString(), 600, 400)})`, objectPosition: 'center 25%' }}
+                        />
 
-                      <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-                        Sélectionné
-                      </div>
+                        {/* Image principale nette - cadrage buste + tête pro */}
+                        <motion.img
+                          src={selectedService.image || getServiceImage(selectedService.id.toString(), 600, 400)}
+                          alt={selectedService.name}
+                          className="relative z-10 w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
+                          style={{ objectPosition: 'center 25%' }}
+                        />
 
-                      <div className="absolute bottom-4 left-4 right-4 text-white">
-                        <h3 className="font-bold text-2xl leading-tight mb-1 text-shadow-sm">{selectedService.name}</h3>
-                        <div className="flex items-center gap-2 opacity-90 text-sm">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>{selectedService.duration} min</span>
+                        <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-md border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-20">
+                          Sélectionné
                         </div>
                       </div>
                     </div>
 
                     <div className="p-6 bg-gradient-to-b from-card to-secondary/20 space-y-6">
+                      {/* Infos du service (comme mosaïque) */}
+                      <div className="space-y-3 pb-4 border-b border-border/50">
+                        {/* Badges de catégorie et cible */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {selectedService.category_name && (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm bg-primary">
+                              {selectedService.category_name}
+                            </span>
+                          )}
+
+                          {selectedService.target && (
+                            <span
+                              className={cn(
+                                "px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm",
+                                selectedService.target === 'homme' && "bg-blue-600",
+                                selectedService.target === 'femme' && "bg-pink-600",
+                                (selectedService.target === 'enfant_fille' || selectedService.target === 'enfant_garcon') && "bg-yellow-600"
+                              )}
+                            >
+                              {selectedService.target === 'homme' && 'Homme'}
+                              {selectedService.target === 'femme' && 'Femme'}
+                              {selectedService.target.startsWith('enfant') && 'Enfant'}
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="font-bold text-xl leading-tight">{selectedService.name}</h3>
+
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="w-4 h-4 text-primary" />
+                          <span>{selectedService.duration} min</span>
+                        </div>
+                      </div>
+
                       <div className="flex justify-between items-end border-b border-border/50 pb-5">
                         <div>
                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider text-[10px]">Prix total</p>
@@ -1379,8 +1477,8 @@ export default function BookingPage() {
                       <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                         Vous ne trouvez pas le créneau idéal ou vous avez une question spécifique ?
                       </p>
-                      <a href="tel:+24100000000" className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-2">
-                        <Phone className="w-3 h-3" /> +241 00 00 00 00
+                      <a href="tel:+212779635687" className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-2">
+                        <Phone className="w-3 h-3" /> +212 779 635 687
                       </a>
                     </div>
                   </div>

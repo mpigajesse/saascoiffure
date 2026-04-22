@@ -3,10 +3,10 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  servicesService, 
-  appointmentsService, 
-  clientsService, 
+import {
+  servicesService,
+  appointmentsService,
+  clientsService,
   employeesService,
   Service,
   ServiceFilters,
@@ -18,6 +18,24 @@ import {
   EmployeeFilters
 } from '@/services';
 import { toast } from 'sonner';
+import { useTenant } from '@/contexts/TenantContext';
+
+// Helper to get salonId with localStorage fallback for superadmins
+function getSalonIdWithFallback(salon: { id?: string | number } | null): string | number | undefined {
+  if (salon?.id) return salon.id;
+
+  // Fallback: try localStorage (AdminContext persists there)
+  try {
+    const savedTenant = localStorage.getItem('admin_selected_tenant');
+    if (savedTenant) {
+      const parsed = JSON.parse(savedTenant);
+      return parsed?.id;
+    }
+  } catch (e) {
+    console.error('Error reading tenant from localStorage', e);
+  }
+  return undefined;
+}
 
 // ============ SERVICES ============
 
@@ -38,9 +56,13 @@ export const useService = (id: number) => {
 
 export const useCreateService = () => {
   const queryClient = useQueryClient();
-  
+  const { salon } = useTenant();
+
   return useMutation({
-    mutationFn: (data: Partial<Service>) => servicesService.createService(data),
+    mutationFn: (data: Partial<Service>) => {
+      const salonId = getSalonIdWithFallback(salon);
+      return servicesService.createService(data, salonId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Service créé avec succès');
@@ -53,9 +75,9 @@ export const useCreateService = () => {
 
 export const useUpdateService = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Service> }) => 
+    mutationFn: ({ id, data }: { id: number; data: Partial<Service> }) =>
       servicesService.updateService(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -70,7 +92,7 @@ export const useUpdateService = () => {
 
 export const useDeleteService = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => servicesService.deleteService(id),
     onSuccess: () => {
@@ -80,6 +102,15 @@ export const useDeleteService = () => {
     onError: (error: Error) => {
       toast.error(error.message || 'Erreur lors de la suppression du service');
     },
+  });
+};
+
+// ============ CATEGORIES ============
+
+export const useCategories = () => {
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: () => servicesService.getCategories(),
   });
 };
 
@@ -124,9 +155,13 @@ export const useUpcomingAppointments = () => {
 
 export const useCreateAppointment = () => {
   const queryClient = useQueryClient();
-  
+  const { salon } = useTenant();
+
   return useMutation({
-    mutationFn: (data: Partial<Appointment>) => appointmentsService.createAppointment(data),
+    mutationFn: (data: Partial<Appointment>) => {
+      const salonId = getSalonIdWithFallback(salon);
+      return appointmentsService.createAppointment(data, salonId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       toast.success('Rendez-vous créé avec succès');
@@ -139,9 +174,9 @@ export const useCreateAppointment = () => {
 
 export const useUpdateAppointment = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Appointment> }) => 
+    mutationFn: ({ id, data }: { id: number; data: Partial<Appointment> }) =>
       appointmentsService.updateAppointment(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -156,7 +191,7 @@ export const useUpdateAppointment = () => {
 
 export const useConfirmAppointment = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => appointmentsService.confirmAppointment(id),
     onSuccess: () => {
@@ -171,7 +206,7 @@ export const useConfirmAppointment = () => {
 
 export const useCancelAppointment = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => appointmentsService.cancelAppointment(id),
     onSuccess: () => {
@@ -186,7 +221,7 @@ export const useCancelAppointment = () => {
 
 export const useCompleteAppointment = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => appointmentsService.completeAppointment(id),
     onSuccess: () => {
@@ -195,6 +230,53 @@ export const useCompleteAppointment = () => {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Erreur');
+    },
+  });
+};
+
+export const useStartAppointment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => appointmentsService.startAppointment(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success('Rendez-vous démarré');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur');
+    },
+  });
+};
+
+export const useRescheduleAppointment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, date, time }: { id: number; date: string; time: string }) =>
+      appointmentsService.rescheduleAppointment(id, date, time),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success('Rendez-vous reporté');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors du report');
+    },
+  });
+};
+
+export const useMoveAppointment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, employeeId }: { id: number; employeeId: number }) =>
+      appointmentsService.moveAppointment(id, employeeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success('Rendez-vous déplacé');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors du déplacement');
     },
   });
 };
@@ -218,9 +300,13 @@ export const useClient = (id: number) => {
 
 export const useCreateClient = () => {
   const queryClient = useQueryClient();
-  
+  const { salon } = useTenant();
+
   return useMutation({
-    mutationFn: (data: Partial<Client>) => clientsService.createClient(data),
+    mutationFn: (data: Partial<Client>) => {
+      const salonId = getSalonIdWithFallback(salon);
+      return clientsService.createClient(data, salonId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       toast.success('Client créé avec succès');
@@ -233,9 +319,9 @@ export const useCreateClient = () => {
 
 export const useUpdateClient = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Client> }) => 
+    mutationFn: ({ id, data }: { id: number; data: Partial<Client> }) =>
       clientsService.updateClient(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -250,7 +336,7 @@ export const useUpdateClient = () => {
 
 export const useDeleteClient = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => clientsService.deleteClient(id),
     onSuccess: () => {
@@ -282,9 +368,9 @@ export const useEmployee = (id: number) => {
 
 export const useCreateEmployee = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (data: Partial<Employee>) => employeesService.createEmployee(data),
+    mutationFn: (data: import('@/services/employees.service').CreateEmployeeDTO) => employeesService.createEmployee(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employé créé avec succès');
@@ -297,9 +383,9 @@ export const useCreateEmployee = () => {
 
 export const useUpdateEmployee = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Employee> }) => 
+    mutationFn: ({ id, data }: { id: number; data: Partial<Employee> }) =>
       employeesService.updateEmployee(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -314,7 +400,7 @@ export const useUpdateEmployee = () => {
 
 export const useToggleEmployeeAvailability = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => employeesService.toggleAvailability(id),
     onSuccess: () => {

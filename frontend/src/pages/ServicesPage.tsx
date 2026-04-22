@@ -4,15 +4,25 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ServiceCard } from '@/components/services';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -30,13 +40,14 @@ export default function ServicesPage() {
   const [selectedTarget, setSelectedTarget] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const queryClient = useQueryClient();
 
   // Récupérer les services depuis l'API
   const { data: services = [], isLoading } = useQuery<Service[]>({
     queryKey: ['services'],
     queryFn: async () => {
-      const response = await apiClient.get('/services/');
+      const response = await apiClient.get('/api/v1/services/');
       // DRF peut retourner un objet paginé ou un tableau
       return Array.isArray(response.data) ? response.data : (response.data.results || []);
     },
@@ -46,15 +57,15 @@ export default function ServicesPage() {
   const { data: categories = [] } = useQuery({
     queryKey: ['serviceCategories'],
     queryFn: async () => {
-      const response = await apiClient.get('/services/categories/');
+      const response = await apiClient.get('/api/v1/services/categories/');
       return Array.isArray(response.data) ? response.data : (response.data.results || []);
     },
   });
 
   const handleTogglePublish = async (service: Service) => {
     try {
-      const response = await apiClient.post(`/services/${service.id}/toggle_published/`);
-      
+      const response = await apiClient.post(`/api/v1/services/${service.id}/toggle_published/`);
+
       toast({
         title: service.is_published ? "Service dépublié" : "Service publié",
         description: `"${service.name}" est maintenant ${service.is_published ? "hors ligne" : "en ligne"}.`,
@@ -72,17 +83,19 @@ export default function ServicesPage() {
     }
   };
 
-  const handleDeleteService = async (service: Service) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer "${service.name}" ?`)) {
-      return;
-    }
+  const handleDeleteService = (service: Service) => {
+    setServiceToDelete(service);
+  };
+
+  const confirmDeleteService = async () => {
+    if (!serviceToDelete) return;
 
     try {
-      await apiClient.delete(`/services/${service.id}/`);
-      
+      await apiClient.delete(`/api/v1/services/${serviceToDelete.id}/`);
+
       toast({
         title: "Service supprimé",
-        description: `"${service.name}" a été supprimé avec succès.`,
+        description: `"${serviceToDelete.name}" a été supprimé avec succès.`,
       });
 
       // Invalider le cache pour refresh
@@ -94,12 +107,19 @@ export default function ServicesPage() {
         description: "Impossible de supprimer le service.",
         variant: "destructive",
       });
+    } finally {
+      setServiceToDelete(null);
     }
   };
 
   // Filtrer les services
   const filteredServices = services.filter(s => {
-    const matchesCategory = selectedCategory === 'all' || s.category?.id.toString() === selectedCategory;
+    // Gestion robuste de l'ID catégorie (peut être un objet ou un ID direct ou undefined)
+    const categoryId = typeof s.category === 'object' && s.category !== null
+      ? s.category.id
+      : s.category;
+
+    const matchesCategory = selectedCategory === 'all' || (categoryId !== undefined && categoryId !== null && categoryId.toString() === selectedCategory);
     const matchesTarget = selectedTarget === 'all' || s.target === selectedTarget;
     const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesTarget && matchesSearch;
@@ -119,7 +139,7 @@ export default function ServicesPage() {
             </h1>
             <p className="text-muted-foreground mt-1">{services.length} services disponibles</p>
           </div>
-          
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 shadow-md hover:shadow-glow-primary transition-all duration-300 hover:scale-105">
@@ -302,16 +322,40 @@ export default function ServicesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredServices.map((service) => (
-              <ServiceCard 
-                key={service.id} 
-                service={service}
-                onTogglePublish={() => handleTogglePublish(service)}
-                onDelete={() => handleDeleteService(service)}
-              />
-            ))}
+            {filteredServices.map((service) => {
+              // Trouver la catégorie associée au service
+              const serviceCategoryId = typeof service.category === 'object' ? service.category?.id : service.category;
+              const serviceCategory = categories.find(c => c.id.toString() === serviceCategoryId?.toString());
+
+              return (
+                <ServiceCard
+                  key={service.id}
+                  service={service}
+                  category={serviceCategory}
+                  onTogglePublish={() => handleTogglePublish(service)}
+                  onDelete={() => handleDeleteService(service)}
+                />
+              );
+            })}
           </div>
         )}
+
+        <AlertDialog open={!!serviceToDelete} onOpenChange={(open) => !open && setServiceToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer ce service ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action est irréversible. Le service "{serviceToDelete?.name}" sera définitivement supprimé de votre catalogue.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteService} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

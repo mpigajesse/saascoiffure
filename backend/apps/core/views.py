@@ -4,10 +4,30 @@ Views for core app - Salon management
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from .models import Salon
-from .serializers import SalonSerializer
+from .serializers import SalonSerializer, PublicSalonSerializer
 from apps.core.permissions import IsSalonAdmin
+
+
+class PublicSalonView(APIView):
+    """
+    Vue publique pour récupérer les informations d'un salon par son slug.
+    Accessible sans authentification.
+    """
+    permission_classes = [AllowAny]
+    
+    def get(self, request, slug):
+        try:
+            salon = Salon.objects.get(slug=slug, is_active=True)
+            serializer = PublicSalonSerializer(salon)
+            return Response(serializer.data)
+        except Salon.DoesNotExist:
+            return Response(
+                {'error': 'Salon non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class SalonViewSet(viewsets.ModelViewSet):
@@ -17,6 +37,18 @@ class SalonViewSet(viewsets.ModelViewSet):
     """
     serializer_class = SalonSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['patch', 'put'], url_path='update-my-salon', permission_classes=[IsAuthenticated])
+    def update_my_salon(self, request):
+        user = request.user
+        # Assumes user.salon FK exists; adjust if different
+        salon = getattr(user, 'salon', None)
+        if not salon:
+            return Response({'detail': 'Aucun salon associé à cet utilisateur.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(salon, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
     
     def get_queryset(self):
         """Retourne uniquement le salon de l'utilisateur connecté"""

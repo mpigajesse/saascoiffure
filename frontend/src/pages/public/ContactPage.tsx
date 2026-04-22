@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Phone, Mail, MapPin, Clock, Send, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
+import { useOpeningHours } from '@/hooks/useOpeningHours';
 
 import { HeroSection } from '@/components/public/HeroSection';
 import { getPageHeroImage } from '@/lib/unsplash';
@@ -25,8 +26,48 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // Fonction de validation du numéro gabonais
+  const validateGabonPhone = (phone: string): boolean => {
+    if (!phone) return true; // Optionnel dans le formulaire de contact
+
+    // Nettoyer le numéro (enlever espaces, tirets et points)
+    const cleaned = phone.replace(/[\s\-\.]/g, '');
+
+    // Nouveau format (9 chiffres):
+    // Moov: 062, 063, 065, 066 + 6 chiffres
+    // Airtel: 074, 077 + 6 chiffres
+    const moovPattern = /^0(62|63|65|66)\d{6}$/;
+    const airtelPattern = /^0(74|77)\d{6}$/;
+
+    // Format international
+    const moovInternational = /^\+2410(62|63|65|66)\d{6}$/;
+    const airtelInternational = /^\+2410(74|77)\d{6}$/;
+
+    // Ancien format (8 chiffres) - accepté pour migration
+    const oldMoovPattern = /^06\d{6}$/;
+    const oldAirtelPattern = /^07\d{6}$/;
+
+    return moovPattern.test(cleaned) ||
+      airtelPattern.test(cleaned) ||
+      moovInternational.test(cleaned) ||
+      airtelInternational.test(cleaned) ||
+      oldMoovPattern.test(cleaned) ||
+      oldAirtelPattern.test(cleaned);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation du téléphone si fourni
+    if (formData.phone && !validateGabonPhone(formData.phone)) {
+      toast({
+        title: "Numéro invalide",
+        description: "Moov: 062/063/065/066 XX XX XX, Airtel: 074/077 XX XX XX",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     // Simulation d'envoi
@@ -120,7 +161,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold mb-1">Horaires</h3>
-                    <p className="text-muted-foreground">{salon.opening_hours}</p>
+                    <HorairesAvances salonId={salon?.id} />
                   </div>
                 </div>
               </div>
@@ -177,8 +218,14 @@ export default function ContactPage() {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="Ex: +241 06 12 34 56 78"
+                        placeholder="Ex: 074 12 34 56 ou 062 12 34 56"
+                        className={formData.phone && !validateGabonPhone(formData.phone) ? 'border-destructive' : ''}
                       />
+                      {formData.phone && !validateGabonPhone(formData.phone) && (
+                        <p className="text-xs text-destructive">
+                          Moov: 062/063/065/066 XX XX XX, Airtel: 074/077 XX XX XX
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -220,3 +267,21 @@ export default function ContactPage() {
   );
 }
 
+// Affichage des horaires avancés (par jour)
+function HorairesAvances({ salonId }: { salonId: string | number | undefined }) {
+  const { openingHours, loading, error } = useOpeningHours();
+  if (!salonId) return <span className="text-muted-foreground">Salon inconnu</span>;
+  if (loading) return <span className="text-muted-foreground">Chargement...</span>;
+  if (error) return <span className="text-destructive">Erreur: {error}</span>;
+  if (!Array.isArray(openingHours) || openingHours.length === 0) return <span className="text-muted-foreground">Aucun horaire configuré.</span>;
+  return (
+    <ul className="text-muted-foreground text-sm">
+      {openingHours.map(h => (
+        <li key={h.id}>
+          <span className="font-medium">{h.day_of_week_display} :</span>{' '}
+          {h.is_closed ? <span className="text-destructive">Fermé</span> : <>{h.open_time} - {h.close_time}</>}
+        </li>
+      ))}
+    </ul>
+  );
+}

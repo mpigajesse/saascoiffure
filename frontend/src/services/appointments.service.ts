@@ -12,6 +12,7 @@ export interface Appointment {
   client_name?: string;
   employee: number;
   employee_name?: string;
+  employee_user_id?: number;  // ID de l'utilisateur de l'employé (pour vérifier la propriété)
   service: number;
   service_name?: string;
   date: string;
@@ -68,9 +69,10 @@ export const appointmentsService = {
   /**
    * Create new appointment
    */
-  async createAppointment(data: Partial<Appointment>): Promise<Appointment> {
+  async createAppointment(data: Partial<Appointment>, salonId?: string | number): Promise<Appointment> {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.appointments.create, data);
+      const config = salonId ? { headers: { 'X-Salon-Id': String(salonId) } } : {};
+      const response = await apiClient.post(API_ENDPOINTS.appointments.create, data, config);
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -155,6 +157,47 @@ export const appointmentsService = {
     try {
       const response = await apiClient.post(API_ENDPOINTS.appointments.complete(id));
       return response.data;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Start appointment (set to IN_PROGRESS)
+   */
+  async startAppointment(id: number): Promise<Appointment> {
+    try {
+      const response = await apiClient.post(`${API_ENDPOINTS.appointments.detail(id)}/start/`);
+      return response.data.appointment;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Reschedule appointment to new date/time
+   */
+  async rescheduleAppointment(id: number, date: string, time: string): Promise<Appointment> {
+    try {
+      const response = await apiClient.post(`${API_ENDPOINTS.appointments.detail(id)}/reschedule/`, {
+        date,
+        time
+      });
+      return response.data.appointment;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Move appointment to different employee
+   */
+  async moveAppointment(id: number, employeeId: number): Promise<Appointment> {
+    try {
+      const response = await apiClient.post(`${API_ENDPOINTS.appointments.detail(id)}/move/`, {
+        employee_id: employeeId
+      });
+      return response.data.appointment;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }

@@ -12,6 +12,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     # Relations en lecture seule
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     employee_name = serializers.CharField(source='employee.get_full_name', read_only=True)
+    employee_user_id = serializers.IntegerField(source='employee.user.id', read_only=True)
     service_name = serializers.CharField(source='service.name', read_only=True)
     service_price = serializers.DecimalField(
         source='service.price',
@@ -24,7 +25,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = [
-            'id', 'client', 'client_name', 'employee', 'employee_name',
+            'id', 'client', 'client_name', 'employee', 'employee_name', 'employee_user_id',
             'service', 'service_name', 'service_price',
             'date', 'time', 'duration', 'status', 'status_display',
             'notes', 'payment_method',
@@ -43,6 +44,23 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             'duration', 'notes', 'payment_method'
         ]
     
+    def _get_salon(self):
+        """Récupère le salon depuis le contexte ou header"""
+        request = self.context.get('request')
+        if not request:
+            return None
+        
+        salon = getattr(request, 'salon', None)
+        if not salon and request.user.is_superuser:
+            from apps.core.models import Salon
+            salon_id = request.headers.get('X-Salon-Id') or request.META.get('HTTP_X_SALON_ID')
+            if salon_id:
+                try:
+                    salon = Salon.objects.get(id=salon_id)
+                except (Salon.DoesNotExist, ValueError):
+                    pass
+        return salon
+    
     def validate_date(self, value):
         """Vérifie que la date n'est pas dans le passé"""
         if value < timezone.now().date():
@@ -57,7 +75,9 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         """
         from .services import AppointmentService
         
-        salon = self.context['request'].salon
+        salon = self._get_salon()
+        if not salon:
+            raise serializers.ValidationError({"detail": "Aucun salon sélectionné."})
         
         # Vérification de la disponibilité
         is_available = AppointmentService.check_availability(
@@ -77,7 +97,11 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """Associe le salon lors de la création"""
-        validated_data['salon'] = self.context['request'].salon
+        salon = self._get_salon()
+        if not salon:
+            raise serializers.ValidationError({"detail": "Aucun salon sélectionné."})
+        
+        validated_data['salon'] = salon
         
         # Définir la durée du service si non spécifiée
         if 'duration' not in validated_data:

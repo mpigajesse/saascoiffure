@@ -5,6 +5,7 @@ Utilisateur lié à un salon avec rôle
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
 from apps.core.models import Salon
+from apps.core.validators import validate_gabon_phone
 
 
 class UserManager(BaseUserManager):
@@ -51,7 +52,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField('Email', unique=True)
     first_name = models.CharField('Prénom', max_length=150)
     last_name = models.CharField('Nom', max_length=150)
-    phone = models.CharField('Téléphone', max_length=20, blank=True)
+    phone = models.CharField(
+        'Téléphone', 
+        max_length=20, 
+        blank=True,
+        validators=[validate_gabon_phone],
+        help_text='Format: +241 0X XX XX XX XX (où X = 6 ou 7)'
+    )
     
     # Lien avec le salon (tenant)
     salon = models.ForeignKey(

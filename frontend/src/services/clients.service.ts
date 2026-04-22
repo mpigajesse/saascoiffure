@@ -55,9 +55,11 @@ export const clientsService = {
   /**
    * Create new client
    */
-  async createClient(data: Partial<Client>): Promise<Client> {
+  async createClient(data: Partial<Client>, salonId?: string | number): Promise<Client> {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.clients.create, data);
+      // Fix for superuser creating client without salon context in User model
+      const config = salonId ? { headers: { 'X-Salon-Id': salonId.toString() } } : {};
+      const response = await apiClient.post(API_ENDPOINTS.clients.create, data, config);
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));

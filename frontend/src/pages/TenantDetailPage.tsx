@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Building2, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Clock, 
-  Globe, 
+import {
+  ArrowLeft,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Globe,
   CreditCard,
   Users,
   Calendar,
@@ -41,20 +41,20 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 
 const statusConfig = {
-  active: { 
-    label: 'Actif', 
+  active: {
+    label: 'Actif',
     icon: CheckCircle2,
-    className: 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20' 
+    className: 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20'
   },
-  suspended: { 
-    label: 'Suspendu', 
+  suspended: {
+    label: 'Suspendu',
     icon: AlertCircle,
-    className: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20' 
+    className: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20'
   },
-  inactive: { 
-    label: 'Inactif', 
+  inactive: {
+    label: 'Inactif',
     icon: XCircle,
-    className: 'bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20' 
+    className: 'bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20'
   },
 };
 
@@ -70,7 +70,7 @@ export default function TenantDetailPage() {
     queryFn: async () => {
       try {
         console.log(`Fetching salon details for ID: ${id}`);
-        const response = await apiClient.get(`/salons/${id}/`);
+        const response = await apiClient.get(`/api/v1/salons/${id}/`);
         console.log(`Success! Salon data:`, response.data);
         return response.data;
       } catch (err) {
@@ -127,13 +127,13 @@ export default function TenantDetailPage() {
 
     setIsDeleting(true);
     try {
-      await apiClient.delete(`/salons/${id}/`);
-      
+      await apiClient.delete(`/api/v1/salons/${id}/`);
+
       toast({
         title: "Salon supprimé",
         description: `Le salon "${tenant.name}" a été supprimé avec succès.`,
       });
-      
+
       navigate('/tenants');
     } catch (error) {
       toast({
@@ -199,7 +199,7 @@ export default function TenantDetailPage() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={handleDelete}
                   disabled={isDeleting}
                   className="text-destructive focus:text-destructive"
@@ -219,7 +219,7 @@ export default function TenantDetailPage() {
           transition={{ delay: 0.1 }}
           className="flex flex-wrap items-center gap-3"
         >
-          <Badge 
+          <Badge
             className={cn(
               "px-3 py-1.5 text-sm font-medium border flex items-center gap-2",
               statusConfig[status].className
@@ -229,11 +229,15 @@ export default function TenantDetailPage() {
             {statusConfig[status].label}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            Créé le {new Date(tenant.created_at).toLocaleDateString('fr-FR', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+            {tenant.created_at ? (
+              `Créé le ${new Date(tenant.created_at).toLocaleDateString('fr-FR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}`
+            ) : (
+              'Date de création inconnue'
+            )}
           </span>
         </motion.div>
 
@@ -262,7 +266,7 @@ export default function TenantDetailPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground">Email</p>
-                    <p className="text-sm">{tenant.email}</p>
+                    <p className="text-sm">{tenant.email || 'Non spécifié'}</p>
                   </div>
                 </div>
 
@@ -272,7 +276,7 @@ export default function TenantDetailPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground">Téléphone</p>
-                    <p className="text-sm">{tenant.phone}</p>
+                    <p className="text-sm">{tenant.phone || 'Non spécifié'}</p>
                   </div>
                 </div>
 
@@ -282,7 +286,7 @@ export default function TenantDetailPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground">Adresse</p>
-                    <p className="text-sm">{tenant.address}</p>
+                    <p className="text-sm">{tenant.address || 'Non spécifiée'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -343,8 +347,8 @@ export default function TenantDetailPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground">Couleur principale</p>
                     <div className="flex items-center gap-2">
-                      <div 
-                        className="w-6 h-6 rounded border border-border" 
+                      <div
+                        className="w-6 h-6 rounded border border-border"
                         style={{ backgroundColor: tenant.primary_color }}
                       />
                       <p className="text-sm">{tenant.primary_color}</p>

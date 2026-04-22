@@ -39,7 +39,7 @@ export function ServiceCard({
 }: ServiceCardProps) {
   const isAdmin = variant === 'admin';
   const isPublic = variant === 'public';
-  const serviceImage = service.image || getServiceImage(service.id, 800, 600);
+  const serviceImage = service.main_image_url || service.image || getServiceImage(service.id, 800, 600);
 
   const cardContent = (
     <div
@@ -50,18 +50,26 @@ export function ServiceCard({
         className
       )}
     >
-      {/* Image du service avec effets avancés */}
+      {/* Image du service avec cadrage professionnel salon */}
       <motion.div 
-        className="relative h-48 overflow-hidden bg-secondary group"
+        className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-muted/10 to-secondary/10 group rounded-t-xl"
         whileHover={{ scale: 1.02 }}
         transition={{ duration: 0.3 }}
       >
+        {/* Image floue en arrière-plan pour combler les espaces */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center filter blur-lg scale-110 opacity-30"
+          style={{ backgroundImage: `url(${serviceImage})`, objectPosition: 'center 25%' }}
+        />
+        
+        {/* Image principale nette - cadrage buste + tête pro */}
         <motion.img
           src={serviceImage}
           alt={service.name}
-          className="w-full h-full object-cover"
-          initial={{ scale: 1.1 }}
-          whileHover={{ scale: 1.2 }}
+          className="relative z-10 w-full h-full object-contain"
+          style={{ objectPosition: 'center 25%' }}
+          initial={{ scale: 1 }}
+          whileHover={{ scale: 1.05 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         />
         
@@ -107,42 +115,6 @@ export function ServiceCard({
           </>
         )}
         
-        {/* Badges animés sur l'image */}
-        <motion.div 
-          className="absolute bottom-3 left-3 right-3 flex items-center gap-2 flex-wrap"
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <motion.span
-            className="px-3 py-1 text-xs font-medium rounded-full shadow-lg backdrop-blur-sm text-white border border-white/20"
-            style={{
-              backgroundColor: category?.color || 'hsl(var(--muted))',
-            }}
-            whileHover={{ scale: 1.1, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {category?.name || 'Sans catégorie'}
-          </motion.span>
-          
-          {service.target && (
-            <motion.span
-              className={cn(
-                "px-3 py-1 text-xs font-medium rounded-full shadow-lg backdrop-blur-sm flex items-center gap-1 border border-white/20",
-                service.target === 'homme' && "bg-gradient-to-r from-blue-600 to-blue-700 text-white",
-                service.target === 'femme' && "bg-gradient-to-r from-pink-600 to-pink-700 text-white",
-                service.target === 'enfant' && "bg-gradient-to-r from-yellow-600 to-orange-600 text-white"
-              )}
-              whileHover={{ scale: 1.1, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {service.target === 'homme' && <>Homme</>}
-              {service.target === 'femme' && <>Femme</>}
-              {service.target === 'enfant' && <>Enfant</>}
-            </motion.span>
-          )}
-        </motion.div>
-        
         {/* Effet de brillance au hover */}
         <motion.div
           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 opacity-0 group-hover:opacity-100"
@@ -153,6 +125,34 @@ export function ServiceCard({
       </motion.div>
 
       <div className="p-5">
+        {/* Badges de catégorie et cible - Style unifié avec le frontend */}
+        <div className="flex items-center gap-2 mb-3">
+          <span
+            className="px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm"
+            style={{
+              backgroundColor: category?.color || 'hsl(var(--primary))',
+            }}
+          >
+            {category?.name || 'Service'}
+          </span>
+          
+          {service.target && (
+            <span 
+              className={cn(
+                "px-2 py-1 text-xs font-semibold rounded-full text-white shadow-sm",
+                service.target === 'homme' && "bg-blue-600",
+                service.target === 'femme' && "bg-pink-600",
+                (service.target === 'enfant_fille' || service.target === 'enfant_garcon') && "bg-yellow-600"
+              )}
+            >
+              {service.target === 'homme' && 'Homme'}
+              {service.target === 'femme' && 'Femme'}
+              {service.target === 'enfant_fille' && 'Fille'}
+              {service.target === 'enfant_garcon' && 'Garçon'}
+            </span>
+          )}
+        </div>
+
       {/* Header avec catégorie et actions */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">

@@ -1,3 +1,13 @@
+// Horaires avancés par jour
+export interface SalonOpeningHour {
+  id: number;
+  salon: number;
+  day_of_week: number;
+  day_of_week_display: string;
+  open_time: string;
+  close_time: string;
+  is_closed: boolean;
+}
 // Types pour l'application SalonPro
 
 export interface TenantTheme {
@@ -13,6 +23,7 @@ export interface TenantTheme {
 export interface Salon {
   id: string | number;
   name: string;
+  slug?: string;
   address: string;
   phone: string;
   email: string;
@@ -62,6 +73,14 @@ export interface ServiceCategory {
   color: string;
 }
 
+export interface ServiceImage {
+  id: number;
+  image: string;
+  alt_text?: string;
+  is_primary: boolean;
+  order: number;
+}
+
 export type ServiceTarget = 'homme' | 'femme' | 'enfant_fille' | 'enfant_garcon';
 
 export interface Service {
@@ -81,7 +100,10 @@ export interface Service {
   is_published?: boolean; // Statut de publication
   isPublished?: boolean; // Ancien format
   image?: string; // URL de l'image du service
-  salonId?: string;
+  images?: ServiceImage[]; // Galerie d'images
+  main_image_url?: string; // URL de l'image principale via property backend
+  salon?: number; // ID du salon (API)
+  salonId?: string; // ID du salon (Frontend legacy/contexte)
   created_at?: string;
   updated_at?: string;
 }

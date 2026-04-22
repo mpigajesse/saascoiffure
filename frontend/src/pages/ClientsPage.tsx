@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useClients, useEmployees, useServices } from '@/hooks/useApi';
+import { useClients, useEmployees, useServices, useCreateClient } from '@/hooks/useApi';
 import { AkomaSymbol, AfricanStarSymbol } from '@/components/african-symbols/AfricanSymbols';
 import { 
   Dialog, 
@@ -35,6 +35,7 @@ export default function ClientsPage() {
   const { data: clientsData } = useClients();
   const { data: employeesData } = useEmployees();
   const { data: servicesData } = useServices();
+  const createClientMutation = useCreateClient();
   
   // Extraire les tableaux des réponses paginées
   const clients = clientsData?.results || [];
@@ -44,6 +45,39 @@ export default function ClientsPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Form State for New Client
+  const [newClient, setNewClient] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    notes: '',
+  });
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!newClient.first_name || !newClient.last_name) {
+        toast({ title: "Erreur", description: "Nom et prénom requis", variant: "destructive" });
+        return;
+      }
+      
+      await createClientMutation.mutateAsync(newClient);
+      
+      setIsDialogOpen(false);
+      setNewClient({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        notes: '',
+      });
+    } catch (error) {
+       // handled by mutation onError
+    }
+  };
+
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const [showWhatsAppSimulation, setShowWhatsAppSimulation] = useState(false);
@@ -98,34 +132,68 @@ export default function ClientsPage() {
               <DialogHeader>
                 <DialogTitle>Ajouter un client</DialogTitle>
               </DialogHeader>
-              <form className="space-y-4">
+              <form onSubmit={handleCreateClient} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">Prénom</Label>
-                    <Input id="firstName" placeholder="Prénom" />
+                    <Input 
+                      id="firstName" 
+                      value={newClient.first_name}
+                      onChange={(e) => setNewClient({...newClient, first_name: e.target.value})}
+                      placeholder="Prénom" 
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lastName">Nom</Label>
-                    <Input id="lastName" placeholder="Nom" />
+                    <Input 
+                      id="lastName" 
+                      value={newClient.last_name}
+                      onChange={(e) => setNewClient({...newClient, last_name: e.target.value})}
+                      placeholder="Nom" 
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="email@example.com" />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({...newClient, email: e.target.value})}
+                    placeholder="email@example.com" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Téléphone</Label>
-                  <Input id="phone" placeholder="+33 6 XX XX XX XX" />
+                  <Input 
+                    id="phone" 
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient({...newClient, phone: e.target.value})}
+                    placeholder="+33 6 XX XX XX XX" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes (optionnel)</Label>
-                  <Input id="notes" placeholder="Préférences, allergies..." />
+                  <Input 
+                    id="notes" 
+                    value={newClient.notes}
+                    onChange={(e) => setNewClient({...newClient, notes: e.target.value})}
+                    placeholder="Préférences, allergies..." 
+                  />
                 </div>
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button type="submit" className="shadow-md hover:shadow-glow-primary">Enregistrer</Button>
+                  <Button 
+                    type="submit" 
+                    className="shadow-md hover:shadow-glow-primary"
+                    disabled={createClientMutation.isPending}
+                  >
+                    {createClientMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                  </Button>
                 </div>
               </form>
             </DialogContent>

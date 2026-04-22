@@ -13,14 +13,46 @@ export interface Employee {
   user_name?: string;
   first_name?: string;
   last_name?: string;
+  full_name?: string;
+  phone?: string;
+  email?: string;
   role?: 'ADMIN' | 'COIFFEUR' | 'RECEPTIONNISTE';
   specialties?: string;
   bio?: string;
   photo?: string;
   is_available: boolean;
   work_schedule?: Record<string, any>;
+  total_appointments?: number;
+  today_appointments?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateEmployeeDTO {
+  email: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+  role: 'ADMIN' | 'COIFFEUR' | 'RECEPTIONNISTE';
+  phone?: string;
+  specialties?: string;
+  bio?: string;
+  photo?: string; // Base64 or URL depending on how file upload is handled
+  work_schedule?: Record<string, any>;
+}
+
+export interface UpdateEmployeeDTO {
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  role?: 'ADMIN' | 'COIFFEUR' | 'RECEPTIONNISTE';
+  specialties?: string;
+  bio?: string;
+  photo?: string;
+  is_available?: boolean;
+  work_schedule?: Record<string, any>;
+  password?: string;
 }
 
 export interface EmployeeFilters {
@@ -59,9 +91,10 @@ export const employeesService = {
   /**
    * Create new employee
    */
-  async createEmployee(data: Partial<Employee>): Promise<Employee> {
+  async createEmployee(data: CreateEmployeeDTO, salonId?: string | number): Promise<Employee> {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.employees.create, data);
+      const config = salonId ? { headers: { 'X-Salon-Id': String(salonId) } } : {};
+      const response = await apiClient.post(API_ENDPOINTS.employees.create, data, config);
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -71,9 +104,9 @@ export const employeesService = {
   /**
    * Update employee
    */
-  async updateEmployee(id: number, data: Partial<Employee>): Promise<Employee> {
+  async updateEmployee(id: number, data: UpdateEmployeeDTO): Promise<Employee> {
     try {
-      const response = await apiClient.put(API_ENDPOINTS.employees.update(id), data);
+      const response = await apiClient.patch(API_ENDPOINTS.employees.update(id), data);
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));

@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Fonction pour formater les prix avec la devise du salon
-export function formatPrice(price: number, currency: string = 'XAF'): string {
+export function formatPrice(price: number | null | undefined, currency: string = 'XAF'): string {
   const currencySymbols: Record<string, string> = {
     'XAF': 'FCFA',
     'EUR': '€',
@@ -15,7 +15,8 @@ export function formatPrice(price: number, currency: string = 'XAF'): string {
     'CAD': 'CAD',
     'CHF': 'CHF'
   };
-  
+
   const symbol = currencySymbols[currency] || currency;
-  return `${price.toLocaleString()} ${symbol}`;
+  const safePrice = price ?? 0;
+  return `${safePrice.toLocaleString()} ${symbol}`;
 }

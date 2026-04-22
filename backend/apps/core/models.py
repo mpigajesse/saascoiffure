@@ -2,6 +2,7 @@
 Models for Core app - Multi-tenant foundation
 """
 from django.db import models
+from django.utils.text import slugify
 
 
 class Salon(models.Model):
@@ -10,6 +11,7 @@ class Salon(models.Model):
     Chaque salon est un client indépendant avec ses propres données.
     """
     name = models.CharField('Nom du salon', max_length=200)
+    slug = models.SlugField('Slug URL', max_length=200, unique=True, blank=True)
     address = models.TextField('Adresse complète')
     phone = models.CharField('Téléphone', max_length=20)
     email = models.EmailField('Email')
@@ -36,6 +38,18 @@ class Salon(models.Model):
     
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        """Auto-génère le slug à partir du nom si non fourni"""
+        if not self.slug:
+            base_slug = slugify(self.name)
+            slug = base_slug
+            counter = 1
+            while Salon.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class TenantAwareModel(models.Model):

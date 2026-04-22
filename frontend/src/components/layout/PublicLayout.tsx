@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTenant } from '@/contexts/TenantContext';
+import { usePublicRoutes } from '@/hooks/usePublicRoutes';
 import { Button } from '@/components/ui/button';
 import { Calendar, Scissors, Users, Phone, Mail, MapPin, Menu, X, Facebook, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,13 +16,14 @@ interface PublicLayoutProps {
 export function PublicLayout({ children }: PublicLayoutProps) {
   const { salon } = useTenant();
   const location = useLocation();
+  const routes = usePublicRoutes();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { label: 'Accueil', href: '/public', icon: <Calendar className="w-4 h-4" /> },
-    { label: 'Services', href: '/public/services', icon: <Scissors className="w-4 h-4" /> },
-    { label: 'Réserver', href: '/public/booking', icon: <Calendar className="w-4 h-4" /> },
-    { label: 'Contact', href: '/public/contact', icon: <Phone className="w-4 h-4" /> },
+    { label: 'Accueil', href: routes.home, icon: <Calendar className="w-4 h-4" /> },
+    { label: 'Services', href: routes.services, icon: <Scissors className="w-4 h-4" /> },
+    { label: 'Réserver', href: routes.booking, icon: <Calendar className="w-4 h-4" /> },
+    { label: 'Contact', href: routes.contact, icon: <Phone className="w-4 h-4" /> },
   ];
 
   return (
@@ -31,7 +33,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo et nom du salon */}
-            <Link to="/public" className="flex items-center gap-3 group">
+            <Link to={routes.home} className="flex items-center gap-3 group">
               <div className="relative">
                 <GabonMaskSymbol size={40} animated={true} color="gradient" />
                 <div className="absolute -top-1 -right-1">
@@ -68,11 +70,6 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                   </Link>
                 );
               })}
-              <Link to="/admin">
-                <Button variant="outline" size="sm" className="ml-4">
-                  Espace Admin
-                </Button>
-              </Link>
             </nav>
 
             {/* Menu mobile */}

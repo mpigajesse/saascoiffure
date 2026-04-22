@@ -68,3 +68,91 @@ class IsOwnerOrAdmin(permissions.BasePermission):
             return obj.user == request.user
         
         return obj == request.user
+
+
+class CanManageAppointments(permissions.BasePermission):
+    """
+    Permissions granulaires pour la gestion des rendez-vous.
+    
+    Règles:
+    - ADMIN: Toutes les actions
+    - COIFFEUR: Gérer ses propres rendez-vous + confirmer/démarrer/terminer tous les RDV
+    - RECEPTIONNISTE: Créer, confirmer, reporter, déplacer, annuler (pas terminer)
+    """
+    message = "Vous n'avez pas la permission d'effectuer cette action."
+    
+    def has_permission(self, request, view):
+        """Vérification au niveau de la vue"""
+        if not request.user.is_authenticated:
+            return False
+        
+        # Admin a tous les droits
+        if request.user.role == 'ADMIN':
+            return True
+        
+        # Actions publiques (création depuis le site web)
+        if view.action == 'create' and not hasattr(request.user, 'role'):
+            return True
+        
+        # Vérifier que l'utilisateur est employé
+        if not hasattr(request.user, 'role'):
+            return False
+        
+        action = view.action
+        role = request.user.role
+        
+        # Réceptionniste peut créer, lister, voir détails
+        if role == 'RECEPTIONNISTE':
+            if action in ['list', 'retrieve', 'create', 'today', 'upcoming', 'available_slots', 'check_availability']:
+                return True
+        
+        # Coiffeur peut lister et voir détails
+        if role == 'COIFFEUR':
+            if action in ['list', 'retrieve', 'today', 'upcoming', 'available_slots', 'check_availability']:
+                return True
+        
+        # Les actions spécifiques sont gérées dans has_object_permission
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        """Vérification au niveau de l'objet (rendez-vous spécifique)"""
+        if not request.user.is_authenticated:
+            return False
+        
+        # Admin a tous les droits
+        if request.user.role == 'ADMIN':
+            return True
+        
+        action = view.action
+        role = request.user.role
+        
+        # Vérifier que le RDV appartient au même salon
+        if hasattr(obj, 'salon') and obj.salon != request.salon:
+            return False
+        
+        # RÉCEPTIONNISTE
+        if role == 'RECEPTIONNISTE':
+            # Peut confirmer, reporter, déplacer, annuler
+            if action in ['confirm', 'reschedule', 'move', 'cancel', 'update', 'partial_update']:
+                return True
+            # Ne peut PAS démarrer ni terminer
+            if action in ['start', 'complete']:
+                return False
+        
+        # COIFFEUR
+        if role == 'COIFFEUR':
+            # Peut confirmer, démarrer, terminer n'importe quel RDV
+            if action in ['confirm', 'start', 'complete']:
+                return True
+            
+            # Peut gérer (reporter, déplacer, annuler, modifier) UNIQUEMENT ses propres RDV
+            if action in ['reschedule', 'move', 'cancel', 'update', 'partial_update', 'destroy']:
+                # Vérifier que c'est son propre rendez-vous
+                from apps.employees.models import Employee
+                try:
+                    employee = Employee.objects.get(user=request.user, salon=request.salon)
+                    return obj.employee == employee
+                except Employee.DoesNotExist:
+                    return False
+        
+        return False

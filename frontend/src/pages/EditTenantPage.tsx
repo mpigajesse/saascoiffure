@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -53,7 +53,7 @@ export default function EditTenantPage() {
   const { data: tenant, isLoading: isLoadingData, error } = useQuery<Salon>({
     queryKey: ['salon', id],
     queryFn: async () => {
-      const response = await apiClient.get(`/salons/${id}/`);
+      const response = await apiClient.get(`/api/v1/salons/${id}/`);
       return response.data;
     },
     enabled: !!id,
@@ -63,14 +63,15 @@ export default function EditTenantPage() {
   useEffect(() => {
     if (tenant) {
       setFormData({
-        name: tenant.name,
-        email: tenant.email,
-        phone: tenant.phone,
-        address: tenant.address,
-        opening_hours: tenant.opening_hours,
-        currency: tenant.currency,
-        timezone: tenant.timezone,
+        name: tenant.name || '',
+        email: tenant.email || '',
+        phone: tenant.phone || '',
+        address: tenant.address || '',
+        opening_hours: tenant.opening_hours || '8h00 - 18h00',
+        currency: tenant.currency || 'XAF',
+        timezone: tenant.timezone || 'Africa/Libreville',
         logo: tenant.logo || '',
+        heroImage: tenant.heroImage || '',
       });
     }
   }, [tenant]);
@@ -158,9 +159,9 @@ export default function EditTenantPage() {
         timezone: formData.timezone,
         ...(formData.logo ? { logo: formData.logo } : {}), // Ne send que si non-vide
       };
-      
+
       console.log('Sending data to API:', dataToSend);
-      const response = await apiClient.patch(`/salons/${id}/`, dataToSend);
+      const response = await apiClient.patch(`/api/v1/salons/${id}/`, dataToSend);
       console.log('API Response:', response.data);
 
       // Invalider le cache pour forcer un refresh des données
@@ -255,7 +256,7 @@ export default function EditTenantPage() {
                 <Input
                   id="name"
                   placeholder="Ex: Salon Mireille, Coiffure Awa, Studio Koffi"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => handleChange('name', e.target.value)}
                   required
                   className="h-11"
@@ -270,7 +271,7 @@ export default function EditTenantPage() {
                   id="email"
                   type="email"
                   placeholder="Ex: contact@salon-mireille.ga"
-                  value={formData.email}
+                  value={formData.email || ''}
                   onChange={(e) => handleChange('email', e.target.value)}
                   required
                   className="h-11"
@@ -287,7 +288,7 @@ export default function EditTenantPage() {
                   id="phone"
                   type="tel"
                   placeholder="Ex: +241 06 12 34 56 78"
-                  value={formData.phone}
+                  value={formData.phone || ''}
                   onChange={(e) => handleChange('phone', e.target.value)}
                   required
                   className="h-11"
@@ -304,7 +305,7 @@ export default function EditTenantPage() {
                 <Input
                   id="address"
                   placeholder="Ex: Avenue Léon Mba, Libreville, Gabon"
-                  value={formData.address}
+                  value={formData.address || ''}
                   onChange={(e) => handleChange('address', e.target.value)}
                   required
                   className="h-11"
@@ -328,7 +329,7 @@ export default function EditTenantPage() {
                 <Input
                   id="opening_hours"
                   placeholder="Ex: 8h00 - 18h00"
-                  value={formData.opening_hours}
+                  value={formData.opening_hours || ''}
                   onChange={(e) => handleChange('opening_hours', e.target.value)}
                   className="h-11"
                 />
@@ -339,7 +340,7 @@ export default function EditTenantPage() {
                   Devise
                 </Label>
                 <Select
-                  value={formData.currency}
+                  value={formData.currency || 'XAF'}
                   onValueChange={(value) => handleChange('currency', value)}
                 >
                   <SelectTrigger id="currency" className="h-11">
@@ -358,7 +359,7 @@ export default function EditTenantPage() {
                   Fuseau horaire
                 </Label>
                 <Select
-                  value={formData.timezone}
+                  value={formData.timezone || 'Africa/Libreville'}
                   onValueChange={(value) => handleChange('timezone', value)}
                 >
                   <SelectTrigger id="timezone" className="h-11">

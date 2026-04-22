@@ -12,11 +12,12 @@ from drf_yasg import openapi
 
 # Import ViewSets
 from apps.clients.views import ClientViewSet
-from apps.employees.views import EmployeeViewSet
-from apps.services.views import ServiceViewSet, ServiceCategoryViewSet
+from apps.employees.views import EmployeeViewSet, PublicEmployeeViewSet
+from apps.services.views import ServiceViewSet, ServiceCategoryViewSet, PublicServiceViewSet, PublicServiceCategoryViewSet
 from apps.appointments.views import AppointmentViewSet
 from apps.payments.views import PaymentViewSet
-from apps.core.views import SalonViewSet
+from apps.core.views import SalonViewSet, PublicSalonView
+from apps.core.views_openinghours import SalonOpeningHourViewSet
 
 # API Documentation
 schema_view = get_schema_view(
@@ -40,6 +41,7 @@ router.register(r'services', ServiceViewSet, basename='service')
 router.register(r'appointments', AppointmentViewSet, basename='appointment')
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'salons', SalonViewSet, basename='salon')
+router.register(r'opening-hours', SalonOpeningHourViewSet, basename='openinghour')
 
 urlpatterns = [
     # Admin
@@ -51,6 +53,20 @@ urlpatterns = [
     
     # API v1 - Auth (separate because it uses different views)
     path('api/v1/auth/', include('apps.accounts.urls')),
+    
+    # API v1 - Public endpoints (no auth required)
+    path('api/v1/public/salon/<slug:slug>/', PublicSalonView.as_view(), name='public-salon'),
+    path('api/v1/public/salon/<slug:salon_slug>/services/', 
+         PublicServiceViewSet.as_view({'get': 'list'}), name='public-services'),
+    path('api/v1/public/salon/<slug:salon_slug>/services/<int:pk>/', 
+         PublicServiceViewSet.as_view({'get': 'retrieve'}), name='public-service-detail'),
+    path('api/v1/public/salon/<slug:salon_slug>/categories/', 
+         PublicServiceCategoryViewSet.as_view({'get': 'list'}), name='public-categories'),
+    path('api/v1/public/salon/<slug:salon_slug>/employees/', 
+         PublicEmployeeViewSet.as_view({'get': 'list'}), name='public-employees'),
+    
+    # API v1 - Public booking endpoints (no auth required)
+    path('api/v1/public/booking/', include('apps.appointments.public_urls')),
     
     # API v1 - All other endpoints via main router
     path('api/v1/', include(router.urls)),
