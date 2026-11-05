@@ -15,6 +15,7 @@ export interface Appointment {
   employee_user_id?: number;  // ID de l'utilisateur de l'employé (pour vérifier la propriété)
   service: number;
   service_name?: string;
+  service_price?: string;  // décimal sérialisé en chaîne par DRF
   date: string;
   start_time: string;
   end_time: string;

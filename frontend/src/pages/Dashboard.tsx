@@ -19,7 +19,10 @@ export default function Dashboard() {
   const { salon } = useTenant();
   
   // Utilisation des vrais hooks React Query
-  const { data: appointmentsData, isLoading: appointmentsLoading } = useAppointments();
+  // Rendez-vous du jour demandés à l'API (?date=) : filtrer côté navigateur
+  // la seule première page (20 résultats, futurs d'abord) ne trouvait rien.
+  const today = new Date().toISOString().split('T')[0];
+  const { data: appointmentsData, isLoading: appointmentsLoading } = useAppointments({ date: today });
   const { data: employeesData, isLoading: employeesLoading } = useEmployees();
   const { data: clientsData, isLoading: clientsLoading } = useClients();
   const { data: servicesData, isLoading: servicesLoading } = useServices();
@@ -30,12 +33,14 @@ export default function Dashboard() {
   const clients = clientsData?.results || [];
   const services = servicesData?.results || [];
   
-  // Filtrer les rendez-vous d'aujourd'hui
-  const today = new Date().toISOString().split('T')[0];
   const todayAppointments = appointments.filter(apt => apt.date === today);
   
   // Calculer les statistiques
-  const todayRevenue = todayAppointments.reduce((sum, apt) => sum + (apt.price || 0), 0);
+  // CA du jour : prestations terminées, au prix du service (`service_price`,
+  // chaîne décimale renvoyée par l'API ; `price` n'existe pas sur un rendez-vous).
+  const todayRevenue = todayAppointments
+    .filter(apt => apt.status === 'COMPLETED')
+    .reduce((sum, apt) => sum + Number(apt.service_price ?? 0), 0);
   const activeEmployees = employees.filter(e => e.is_active);
   
   const isLoading = appointmentsLoading || employeesLoading || clientsLoading || servicesLoading;

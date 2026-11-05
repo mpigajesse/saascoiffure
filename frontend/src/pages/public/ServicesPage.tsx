@@ -30,8 +30,10 @@ export default function ServicesPage() {
   const { scrollY } = useScroll();
   
   // Récupération des données via API - use public or authenticated endpoints
-  const privateServicesQuery = useServices();
-  const privateCategsQuery = useServiceCategories();
+  // Seule la source utile est interrogée : sur la vitrine publique, l'appel
+  // privé échouait en 401 et l'intercepteur redirigeait vers /login.
+  const privateServicesQuery = useServices(undefined, { enabled: !isPublicRoute });
+  const privateCategsQuery = useServiceCategories({ enabled: !isPublicRoute });
   const publicServicesQuery = usePublicServices();
   const publicCategsQuery = usePublicServiceCategories();
   

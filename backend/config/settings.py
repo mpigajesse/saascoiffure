@@ -27,6 +27,12 @@ ALLOWED_HOSTS = [
 ]
 
 # Trust Cloudflare Proxy headers
+# Hébergement (Render) : hôtes supplémentaires séparés par des virgules,
+# et l'hôte que Render injecte lui-même.
+ALLOWED_HOSTS += [h.strip() for h in config('ALLOWED_HOSTS_EXTRA', default='').split(',') if h.strip()]
+if config('RENDER_EXTERNAL_HOSTNAME', default=''):
+    ALLOWED_HOSTS.append(config('RENDER_EXTERNAL_HOSTNAME'))
+
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
@@ -57,6 +63,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Sert les fichiers statiques (admin, Swagger) sans serveur web dédié.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -100,6 +108,11 @@ DATABASES = {
     }
 }
 
+# En ligne : une seule URL (Neon, Render…) prime sur les variables DB_*.
+if config('DATABASE_URL', default=''):
+    import dj_database_url
+    DATABASES['default'] = dj_database_url.parse(config('DATABASE_URL'), conn_max_age=60, ssl_require=True)
+
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -134,11 +147,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+# Le dossier static/ n'existe pas toujours : ne le déclarer que s'il est là
+# (sinon avertissement à chaque commande, et collectstatic échoue en ligne).
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 
 # Media files
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+SERVE_MEDIA = config('SERVE_MEDIA', default=False, cast=bool)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -195,7 +211,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 # CSRF Settings for Tunnel
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in config('CSRF_TRUSTED_ORIGINS_EXTRA', default='').split(',') if o.strip()] + [
     "https://tunnel-front-naoservices.workers.dev",
     "https://tunnel-back-naoservices.workers.dev",
 ]
