@@ -2,6 +2,9 @@
 
 > Solution SaaS multi-tenant de gestion de salons de coiffure — **Made in Gabon**
 
+**Démo en ligne : [naoservice.eu.cc/s/salon-mireille](https://naoservice.eu.cc/s/salon-mireille)**
+Salon et clientèle fictifs : les identifiants de démonstration sont affichés sur la page de connexion. La démo tourne sur une offre gratuite et met environ 50 secondes à se réveiller au premier accès.
+
 Plateforme web complète permettant aux salons de coiffure de gérer leurs rendez-vous, leur clientèle, leurs employés, leurs prestations et leurs paiements depuis une interface moderne et intuitive.
 
 ---
