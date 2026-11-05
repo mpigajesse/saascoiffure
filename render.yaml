@@ -1,15 +1,17 @@
-# Blueprint Render — API Django de la démo NaoService (offre gratuite).
-# Render > New > Blueprint > ce dépôt. Les variables « sync: false » sont
-# demandées à la création (voir DEPLOIEMENT.md).
+# Blueprint Render — démo publique NaoService, entièrement gratuite (voir DEPLOIEMENT.md).
+# Render > New > Blueprint > ce dépôt. Les variables « sync: false » sont demandées
+# à la création.
 services:
   - type: web
     name: naoservice-api
     runtime: python
     plan: free
+    region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    # migrate + seed_demo à chaque démarrage : le disque gratuit est éphémère,
-    # seed_demo restaure les photos et ne recrée rien d'autre (idempotent).
+    # Base SQLite sur le disque éphémère : à chaque réveil, migrate + seed_demo
+    # recréent le salon fictif. La démo revient donc d'elle-même à son état
+    # initial, sans base externe ni expiration.
     startCommand: python manage.py migrate --noinput && python manage.py seed_demo && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
     healthCheckPath: /api/v1/public/salon/salon-mireille/services/
     envVars:
@@ -21,11 +23,29 @@ services:
         generateValue: true
       - key: SERVE_MEDIA
         value: "True"
-      - key: DATABASE_URL          # chaîne Neon (postgresql://…?sslmode=require)
-        sync: false
-      - key: DEMO_PASSWORD         # mot de passe des comptes de démo, affiché sur la démo
-        sync: false
-      - key: CORS_ALLOWED_ORIGINS  # URL Vercel du frontend, ex. https://naoservice.vercel.app
-        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///demo.sqlite3
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://naoservice.onrender.com
       - key: CSRF_TRUSTED_ORIGINS_EXTRA
+        value: https://naoservice.onrender.com
+      - key: DEMO_PASSWORD         # affiché sur la page de connexion de la démo
+        sync: false
+
+  - type: web
+    name: naoservice
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://naoservice-api.onrender.com
+      - key: VITE_DEMO_EMAIL
+        value: mireille@demo.naoservice.ga
+      - key: VITE_DEMO_PASSWORD    # même valeur que DEMO_PASSWORD
         sync: false

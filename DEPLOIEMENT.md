@@ -1,50 +1,33 @@
-# Déployer la démo publique (gratuit)
+# Déployer la démo publique (gratuit, tout sur Render)
 
-Trois services gratuits, sans carte bancaire :
+`render.yaml` décrit deux services gratuits, sans carte bancaire ni base externe :
 
-| Rôle | Service | Ce qu'il héberge |
+| Service | Nom Render | Ce qu'il héberge |
 |---|---|---|
-| Base de données | **Neon** (PostgreSQL) | les données du salon de démo, persistantes |
-| API Django | **Render** (Web Service gratuit) | `backend/`, décrit par `render.yaml` |
-| Frontend | **Vercel** | `frontend/` (Vite) |
+| Web Service (Python) | `naoservice-api` | API Django, base SQLite sur le disque éphémère |
+| Static Site | `naoservice` | frontend Vite (`frontend/`) |
 
-> Render met le service en veille après 15 min sans visite : la première
-> requête suivante prend ~30 s. Le reste du temps, la démo répond normalement.
+**Pourquoi SQLite :** le disque gratuit de Render est effacé à chaque mise en veille (15 min
+sans visite). Au réveil, `migrate` puis `seed_demo` recréent le salon fictif. La démo revient
+donc toute seule à son état initial : ce qu'un visiteur modifie disparaît, et il n'y a ni base
+externe à entretenir ni base gratuite qui expire. Le premier chargement après une veille prend
+environ 30 à 60 s.
 
-## 1. Base Neon
+## Mise en place
 
-1. https://neon.tech → *New project* → nom `naoservice-demo`, région Europe (Frankfurt).
-2. Copier la *connection string* (format `postgresql://…?sslmode=require`).
-
-## 2. API sur Render
-
-1. https://render.com → *New* → *Blueprint* → choisir ce dépôt. Render lit `render.yaml`.
-2. Renseigner les variables demandées :
-   - `DATABASE_URL` : la chaîne Neon ;
-   - `DEMO_PASSWORD` : mot de passe des comptes de démo (il sera **affiché** sur la page de
-     connexion — n'en choisir aucun que tu utilises ailleurs) ;
-   - `CORS_ALLOWED_ORIGINS` et `CSRF_TRUSTED_ORIGINS_EXTRA` : l'URL Vercel du frontend
-     (à compléter après l'étape 3, ex. `https://naoservice.vercel.app`).
-3. Au démarrage, Render lance `migrate`, puis `seed_demo` (salon « Salon Mireille »,
-   équipe, clientes, prestations avec photos, rendez-vous et paiements — tout fictif), puis
-   `gunicorn`. L'adresse de l'API ressemble à `https://naoservice-api.onrender.com`.
-4. Vérifier : `https://naoservice-api.onrender.com/api/v1/public/salon/salon-mireille/services/`
-   doit renvoyer 7 prestations.
-
-## 3. Frontend sur Vercel
-
-1. https://vercel.com → *Add New* → *Project* → ce dépôt, **Root Directory : `frontend`**
-   (framework Vite détecté). `frontend/vercel.json` renvoie toutes les routes vers l'appli.
-2. Variables d'environnement :
-   - `VITE_API_BASE_URL` = l'URL Render (sans `/api/v1` ni barre finale) ;
-   - `VITE_DEMO_EMAIL` = `mireille@demo.naoservice.ga` ;
-   - `VITE_DEMO_PASSWORD` = la même valeur que `DEMO_PASSWORD` sur Render.
-3. Déployer, puis reporter l'URL Vercel dans les deux variables CORS/CSRF de Render.
+1. Render → *New* → *Blueprint* → ce dépôt (Render lit `render.yaml`).
+2. Saisir la même valeur pour `DEMO_PASSWORD` (API) et `VITE_DEMO_PASSWORD` (frontend). Elle
+   est **affichée** sur la page de connexion : n'en choisir aucune qui serve ailleurs.
+3. Adresses : `https://naoservice.onrender.com` (démo) et
+   `https://naoservice-api.onrender.com` (API). Si Render attribue d'autres noms, reporter
+   l'adresse du frontend dans `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS_EXTRA` et celle de
+   l'API dans `VITE_API_BASE_URL`.
+4. Vérifier : `…/api/v1/public/salon/salon-mireille/services/` renvoie 7 prestations.
 
 ## Nom de domaine (facultatif)
 
-Dans Vercel : *Settings → Domains* → ajouter le domaine, puis créer chez le fournisseur du
-domaine l'enregistrement CNAME indiqué. Ajouter aussi ce domaine aux variables CORS/CSRF.
+Render → service `naoservice` → *Settings* → *Custom Domains*, puis l'enregistrement CNAME
+indiqué chez le fournisseur du domaine. Ajouter ce domaine aux variables CORS/CSRF de l'API.
 
 ## Comptes de démonstration
 

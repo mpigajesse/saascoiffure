@@ -111,7 +111,11 @@ DATABASES = {
 # En ligne : une seule URL (Neon, Render…) prime sur les variables DB_*.
 if config('DATABASE_URL', default=''):
     import dj_database_url
-    DATABASES['default'] = dj_database_url.parse(config('DATABASE_URL'), conn_max_age=60, ssl_require=True)
+    DATABASES['default'] = dj_database_url.parse(
+        config('DATABASE_URL'), conn_max_age=60,
+        # SSL seulement pour PostgreSQL : la démo Render tourne sur SQLite.
+        ssl_require=config('DATABASE_URL').startswith('postgres'),
+    )
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
