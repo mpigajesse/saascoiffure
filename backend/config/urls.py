@@ -72,6 +72,13 @@ urlpatterns = [
     path('api/v1/', include(router.urls)),
 ]
 
+# Démo en ligne : Django sert lui-même les photos des prestations (pas de
+# stockage objet sur l'offre gratuite). À réserver à une démo à faible trafic.
+if settings.DEBUG or getattr(settings, 'SERVE_MEDIA', False):
+    from django.urls import re_path
+    from django.views.static import serve
+    urlpatterns += [re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT})]
+
 # Media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

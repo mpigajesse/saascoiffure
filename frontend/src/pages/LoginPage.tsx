@@ -8,8 +8,14 @@ import { toast } from '@/hooks/use-toast';
 import { LogIn, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// Compte de démonstration, affiché seulement si la démo en ligne le définit
+// (variables Vercel). Jamais codé en dur : le dépôt est public, et un
+// identifiant réel affiché ici donnerait l'accès à n'importe qui.
+const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL as string | undefined;
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD as string | undefined;
+
 export default function LoginPage() {
-  const [email, setEmail] = useState('naoadmin@gmail.com');
+  const [email, setEmail] = useState(DEMO_EMAIL ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -174,6 +180,7 @@ export default function LoginPage() {
             </form>
 
             {/* Badge démo professionnel */}
+            {DEMO_EMAIL && DEMO_PASSWORD && (
             <div className="mt-4 p-3 bg-secondary/50 rounded-lg border border-border">
               <div className="flex items-start gap-2">
                 <div className="flex-1">
@@ -181,16 +188,17 @@ export default function LoginPage() {
                   <div className="space-y-0.5 text-xs text-muted-foreground">
                     <p className="flex items-center gap-2">
                       <span className="font-medium">Email:</span>
-                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">naoadmin@gmail.com</code>
+                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">{DEMO_EMAIL}</code>
                     </p>
                     <p className="flex items-center gap-2">
                       <span className="font-medium">Mot de passe:</span>
-                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">Admin@2026</code>
+                      <code className="bg-background px-1.5 py-0.5 rounded text-primary font-mono text-xs">{DEMO_PASSWORD}</code>
                     </p>
                   </div>
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           {/* Footer */}

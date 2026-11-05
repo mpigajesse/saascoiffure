@@ -15,7 +15,7 @@ class TenantManager(models.Manager):
         Retourne tous les objets d'un salon spécifique.
         Usage: Model.objects.for_salon(request.salon)
         """
-        if salon is None:
+        if not salon:  # aussi un SimpleLazyObject qui enveloppe None (middleware)
             return self.none()
         return self.filter(salon=salon)
     

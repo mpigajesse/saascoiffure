@@ -93,13 +93,11 @@ const statusLabels: Record<AppointmentStatus, string> = {
 
 export default function AppointmentsPage() {
   // Utiliser les hooks React Query
-  const { data: appointmentsData } = useAppointmentsQuery();
   const { data: employeesData } = useEmployees();
   const { data: clientsData } = useClients();
   const { data: servicesData } = useServices();
 
   // Extraire les tableaux des réponses paginées
-  const appointments = appointmentsData?.results || [];
   const employees = employeesData?.results || [];
   const clients = clientsData?.results || [];
   const services = servicesData?.results || [];
@@ -148,6 +146,12 @@ export default function AppointmentsPage() {
   const startAppointment = useStartAppointment();
 
   const formattedDate = currentDate.toISOString().split('T')[0];
+
+  // Le jour affiché est demandé à l'API (?date=) : l'API pagine par 20, du
+  // plus lointain au plus proche, et filtrer la seule première page côté
+  // navigateur faisait disparaître les rendez-vous du jour.
+  const { data: appointmentsData } = useAppointmentsQuery({ date: formattedDate });
+  const appointments = appointmentsData?.results || [];
 
   // Filtrage avancé
   const filteredAppointments = useMemo(() => {

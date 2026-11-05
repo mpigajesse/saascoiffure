@@ -1,0 +1,31 @@
+# Blueprint Render — API Django de la démo NaoService (offre gratuite).
+# Render > New > Blueprint > ce dépôt. Les variables « sync: false » sont
+# demandées à la création (voir DEPLOIEMENT.md).
+services:
+  - type: web
+    name: naoservice-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # migrate + seed_demo à chaque démarrage : le disque gratuit est éphémère,
+    # seed_demo restaure les photos et ne recrée rien d'autre (idempotent).
+    startCommand: python manage.py migrate --noinput && python manage.py seed_demo && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    healthCheckPath: /api/v1/public/salon/salon-mireille/services/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SERVE_MEDIA
+        value: "True"
+      - key: DATABASE_URL          # chaîne Neon (postgresql://…?sslmode=require)
+        sync: false
+      - key: DEMO_PASSWORD         # mot de passe des comptes de démo, affiché sur la démo
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS  # URL Vercel du frontend, ex. https://naoservice.vercel.app
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS_EXTRA
+        sync: false

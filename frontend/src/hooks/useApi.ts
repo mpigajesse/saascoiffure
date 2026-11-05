@@ -39,10 +39,13 @@ function getSalonIdWithFallback(salon: { id?: string | number } | null): string 
 
 // ============ SERVICES ============
 
-export const useServices = (filters?: ServiceFilters) => {
+// `enabled` : une page publique qui monte aussi ce hook ne doit pas appeler
+// l'API privée — son 401 renverrait le visiteur vers /login.
+export const useServices = (filters?: ServiceFilters, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['services', filters],
     queryFn: () => servicesService.getServices(filters),
+    enabled: options?.enabled ?? true,
   });
 };
 
@@ -114,10 +117,11 @@ export const useCategories = () => {
   });
 };
 
-export const useServiceCategories = () => {
+export const useServiceCategories = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['serviceCategories'],
     queryFn: () => servicesService.getCategories(),
+    enabled: options?.enabled ?? true,
   });
 };
 
